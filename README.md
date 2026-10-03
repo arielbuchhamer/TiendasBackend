@@ -86,7 +86,7 @@ Listados paginados: `?page=0&size=24&sort=precio,asc` → `{ "content": [...], "
 
 | Público | |
 |---|---|
-| `GET /tienda` | Nombre, moneda y opciones de envío |
+| `GET /tienda` | Nombre, moneda, opciones de envío y módulos activos (`modulos.facturacion`) |
 | `GET /rubros`, `GET /categorias?rubroId=` | Clasificación del catálogo |
 | `GET /productos?rubroId=&categoriaId=&texto=&destacados=` | Listado paginado (solo activos) |
 | `GET /productos/{id}`, `GET /productos/aleatorios?cantidad=12` | Detalle / selección para la home |
@@ -113,6 +113,8 @@ Listados paginados: `?page=0&size=24&sort=precio,asc` → `{ "content": [...], "
 - Productos: el precio de una variante es `variante.precio ?? producto.precio`; al editar, reenviar `version`
   del producto y de cada variante (si cambió por una venta en el medio, la API responde 409).
 - Imágenes: `${API}/api/v1/imagenes/${id}/tarjeta`.
+- Panel: mostrar u ocultar las secciones opcionales según `GET /tienda` → `modulos` (ej. la tarjeta de
+  Facturación solo si `modulos.facturacion` es `true`). Se controla por instancia con `FACTURACION_HABILITADA`.
 - Mercado Pago vuelve a `${TIENDA_FRONTEND_URL}/checkout/exito|pendiente|error` con `external_reference` = código del pedido.
 
 ## Versionado y ramas

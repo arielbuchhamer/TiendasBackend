@@ -21,11 +21,11 @@ class AfRelayClient {
 	private final RestClient restClient;
 	private final JsonMapper jsonMapper;
 
-	AfRelayClient(RestClient.Builder builder, JsonMapper jsonMapper, FacturacionProperties facturacion) {
+	AfRelayClient(JsonMapper jsonMapper, FacturacionProperties facturacion) {
 		SimpleClientHttpRequestFactory fabrica = new SimpleClientHttpRequestFactory();
 		fabrica.setConnectTimeout(Duration.ofSeconds(5));
 		fabrica.setReadTimeout(Duration.ofSeconds(60)); // ARCA puede tardar en responder
-		this.restClient = builder
+		this.restClient = RestClient.builder()
 				.requestFactory(fabrica)
 				.baseUrl(facturacion.afrelay().url())
 				.defaultHeaders(headers -> headers.setBearerAuth(facturacion.afrelay().token()))

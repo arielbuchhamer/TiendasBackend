@@ -119,6 +119,16 @@ Todo en `application.yml` toma valores de variables de entorno; la lista complet
 `FacturacionProperties`) se validan al arrancar. Para agregar un parámetro de tienda: campo en el record + entrada
 en `application.yml` con `${VARIABLE}` + documentarlo en `.env.example`.
 
+### Módulos opcionales
+
+Una funcionalidad opcional (hoy: facturación) se activa por instancia con una sola propiedad
+(`FACTURACION_HABILITADA`). Esa misma propiedad:
+1. crea o no los beans y endpoints del módulo (anotación condicional, ej. `@FacturacionHabilitada`), y
+2. se informa al frontend en `GET /api/v1/tienda` → `modulos`, para que el panel muestre u oculte la sección.
+
+No crear flags de "visibilidad" separados del flag que activa el módulo: podrían quedar desincronizados.
+Para un módulo nuevo: propiedad `xxx.habilitada`, anotación condicional propia y campo en `TiendaController.Modulos`.
+
 Perfil `local` (`application-local.yml`): valores de desarrollo, admin `admin`/`admin-local-123`, cookies sin `secure`.
 
 ## Convenciones de código
