@@ -140,8 +140,9 @@ todo código del paquete `desarrollo` debe llevar `@Profile("local")`.
 
 ### Frontends
 
-La guía para conectar un frontend (hoy FrontHaTablas, hecho para la API vieja de BackTecnophones) está en
-`docs/integracion-frontend.html`. Si se cambia un endpoint o un campo de la API, actualizar esa guía.
+Los frontends viven en sus propios repos (ej. FrontHaTablas). Las guías de integración no se guardan en este
+repositorio. Para conectar uno: `VITE_API_URL=<api>/api/v1` y axios con `withCredentials` y `withXSRFToken` en `true`
+(ver "Para el frontend" en README).
 
 ## Convenciones de código
 

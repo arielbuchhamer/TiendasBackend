@@ -56,8 +56,8 @@ Comprobación rápida: `curl localhost:8080/actuator/health` → `{"status":"UP"
 
 ### Conectar un frontend
 
-Guía completa (endpoints, campos, adaptadores, checkout, CSRF): [`docs/integracion-frontend.html`](docs/integracion-frontend.html).
-Resumen: `VITE_API_URL=http://localhost:8080/api/v1`, axios con `withCredentials` y `withXSRFToken` en `true`.
+`VITE_API_URL=http://localhost:8080/api/v1` y axios con `withCredentials` y `withXSRFToken` en `true`.
+El detalle de la API para el front está en la sección "Para el frontend".
 
 ### Compilar / imagen Docker
 
