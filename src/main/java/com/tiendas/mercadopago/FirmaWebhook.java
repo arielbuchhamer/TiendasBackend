@@ -19,6 +19,7 @@ import org.springframework.util.StringUtils;
  * HMAC-SHA256 con la clave secreta sobre {@code id:<data.id>;request-id:<x-request-id>;ts:<ts>;}.
  */
 @Component
+@MercadoPagoReal
 class FirmaWebhook {
 
 	private final byte[] clave;

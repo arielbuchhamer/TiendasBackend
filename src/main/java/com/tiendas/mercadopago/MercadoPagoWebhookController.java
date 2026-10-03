@@ -24,6 +24,7 @@ import com.tiendas.pedidos.PedidoService;
  * Responde 2xx solo si el pago quedó registrado; ante un error responde 5xx y MP reintenta.
  */
 @RestController
+@MercadoPagoReal
 class MercadoPagoWebhookController {
 
 	private static final Logger log = LoggerFactory.getLogger(MercadoPagoWebhookController.class);

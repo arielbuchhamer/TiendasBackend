@@ -14,6 +14,9 @@ tienda:
     clave: ${TIENDA_ADMIN_INICIAL_CLAVE:admin-local-123}
 
 mercadopago:
+  # Por defecto los pagos se simulan (se aprueban al instante, sin Mercado Pago). Para probar con el
+  # sandbox real: MP_SIMULADO=false + credenciales de prueba en .env + API expuesta (ej. ngrok).
+  simulado: ${MP_SIMULADO:true}
   access-token: ${MP_ACCESS_TOKEN:configurar-en-env}
   webhook-secret: ${MP_WEBHOOK_SECRET:configurar-en-env}
 

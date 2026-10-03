@@ -17,7 +17,12 @@ public record MercadoPagoProperties(
 		/** Clave secreta de Webhooks: valida la firma (x-signature) de cada notificación. */
 		@NotBlank String webhookSecret,
 		/** Rutas del frontend a las que vuelve el comprador después de pagar. */
-		@NotBlank @DefaultValue("/checkout/exito") String rutaExito,
-		@NotBlank @DefaultValue("/checkout/pendiente") String rutaPendiente,
-		@NotBlank @DefaultValue("/checkout/error") String rutaError) {
+		@NotBlank @DefaultValue("/exito") String rutaExito,
+		@NotBlank @DefaultValue("/pendiente") String rutaPendiente,
+		@NotBlank @DefaultValue("/fallo") String rutaError,
+		/**
+		 * Solo desarrollo: aprueba los pedidos sin pasar por Mercado Pago. Requiere el perfil "local";
+		 * en cualquier otro perfil la aplicación no arranca si está activo (no hay pasarela disponible).
+		 */
+		@DefaultValue("false") boolean simulado) {
 }

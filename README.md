@@ -37,18 +37,27 @@ Caffeine · Mercado Pago SDK · AWS SDK S3 · PDFBox · Docker · Railway.
 Requisitos: **JDK 21** y **Docker** (para PostgreSQL).
 
 ```bash
-cp .env.example .env          # completar MP_ACCESS_TOKEN y MP_WEBHOOK_SECRET de PRUEBA (opcional para navegar)
 SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run
 ```
 
+Con el perfil `local`:
 - Spring Boot levanta PostgreSQL solo con `compose.yaml` y Flyway crea el esquema.
-- API en `http://localhost:8080`, frontend esperado en `http://localhost:5173` (CORS).
-- Se crea el administrador `admin` / `admin-local-123` (solo perfil `local`).
+- API en `http://localhost:8080`, frontend esperado en `http://localhost:5173` (CORS y cookies configurados).
+- Se crea el administrador `admin` / `admin-local-123`.
+- Si la base está vacía, se carga un **catálogo de ejemplo** (rubros de HA!Tablas, productos con variantes e imágenes).
+- Los **pagos se simulan**: el checkout aprueba el pedido al instante (descuenta stock) y redirige a `/exito`, sin
+  Mercado Pago. Para usar el sandbox real: `MP_SIMULADO=false` y credenciales de prueba en `.env` (ver
+  `.env.example`); el webhook necesita la API expuesta (ej. `ngrok http 8080` y esa URL en `TIENDA_API_URL`).
+  La simulación solo funciona con el perfil `local`: en cualquier otro perfil la app no arranca si está activa.
 - Imágenes y PDFs se guardan en `./datos/archivos` (ignorado por git).
-- Para probar el webhook de Mercado Pago en local hace falta exponer la API (ej. `ngrok http 8080`) y usar esa URL
-  en `TIENDA_API_URL`.
+- Para empezar de cero: `docker compose down -v` (borra la base local).
 
 Comprobación rápida: `curl localhost:8080/actuator/health` → `{"status":"UP"}`.
+
+### Conectar un frontend
+
+Guía completa (endpoints, campos, adaptadores, checkout, CSRF): [`docs/integracion-frontend.html`](docs/integracion-frontend.html).
+Resumen: `VITE_API_URL=http://localhost:8080/api/v1`, axios con `withCredentials` y `withXSRFToken` en `true`.
 
 ### Compilar / imagen Docker
 
@@ -116,7 +125,7 @@ Listados paginados: `?page=0&size=24&sort=precio,asc` → `{ "content": [...], "
 - Imágenes: `${API}/api/v1/imagenes/${id}/tarjeta`.
 - Panel: mostrar u ocultar las secciones opcionales según `GET /tienda` → `modulos` (ej. la tarjeta de
   Facturación solo si `modulos.facturacion` es `true`). Se controla por instancia con `FACTURACION_HABILITADA`.
-- Mercado Pago vuelve a `${TIENDA_FRONTEND_URL}/checkout/exito|pendiente|error` con `external_reference` = código del pedido.
+- Mercado Pago vuelve a `${TIENDA_FRONTEND_URL}/exito|pendiente|fallo` (configurable con `MERCADOPAGO_RUTA_EXITO`, etc.) con `external_reference` = código del pedido.
 
 ## Versionado y ramas
 

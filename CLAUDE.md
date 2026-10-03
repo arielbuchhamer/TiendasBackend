@@ -57,6 +57,7 @@ Paquetes **por funcionalidad** (no por capa técnica), en `src/main/java/com/tie
 | `pedidos` | Pedido, items, pagos, checkout, registro de pagos, vencimiento, `PasarelaPago` (interfaz) |
 | `mercadopago` | Implementación de `PasarelaPago`, webhook y firma HMAC |
 | `facturacion` | ARCA vía AFRelay; solo se activa con `facturacion.habilitada=true` (`@FacturacionHabilitada`) |
+| `desarrollo` | Solo perfil `local`: `DatosEjemplo` (catálogo HA!Tablas) y `PasarelaSimulada` (pagos sin MP) |
 
 Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (reglas y transacciones) →
 `Repository` (Spring Data JPA). Sin capas extra (no hexagonal, no mappers, no `GenericService`).
@@ -129,7 +130,18 @@ Una funcionalidad opcional (hoy: facturación) se activa por instancia con una s
 No crear flags de "visibilidad" separados del flag que activa el módulo: podrían quedar desincronizados.
 Para un módulo nuevo: propiedad `xxx.habilitada`, anotación condicional propia y campo en `TiendaController.Modulos`.
 
-Perfil `local` (`application-local.yml`): valores de desarrollo, admin `admin`/`admin-local-123`, cookies sin `secure`.
+Perfil `local` (`application-local.yml`): valores de desarrollo, admin `admin`/`admin-local-123`, cookies sin `secure`,
+catálogo de ejemplo y pagos simulados (`MP_SIMULADO`, por defecto `true`).
+
+**Pagos simulados — regla de seguridad:** `PasarelaSimulada` exige `@Profile("local")` **y**
+`mercadopago.simulado=true`; las clases reales de MP llevan `@MercadoPagoReal` (se apagan con esa propiedad). Si la
+propiedad se activa fuera de `local`, no queda ninguna `PasarelaPago` y la app no arranca. No romper ese doble candado:
+todo código del paquete `desarrollo` debe llevar `@Profile("local")`.
+
+### Frontends
+
+La guía para conectar un frontend (hoy FrontHaTablas, hecho para la API vieja de BackTecnophones) está en
+`docs/integracion-frontend.html`. Si se cambia un endpoint o un campo de la API, actualizar esa guía.
 
 ## Convenciones de código
 

@@ -49,7 +49,15 @@ public class ImagenService {
 	 * elimina metadatos EXIF (ubicación GPS, datos de la cámara) de las fotos que sube el admin.
 	 */
 	public Imagen subir(MultipartFile archivo) {
-		BufferedImage original = leer(archivo);
+		try (InputStream entrada = archivo.getInputStream()) {
+			return subir(entrada, archivo.getOriginalFilename());
+		} catch (IOException e) {
+			throw new ReglaNegocioException("No se pudo leer la imagen " + archivo.getOriginalFilename());
+		}
+	}
+
+	public Imagen subir(InputStream entrada, String nombre) {
+		BufferedImage original = leer(entrada, nombre);
 		boolean conTransparencia = original.getColorModel().hasAlpha();
 		String formato = conTransparencia ? "png" : "jpg";
 		String contentType = conTransparencia ? "image/png" : "image/jpeg";
@@ -78,9 +86,8 @@ public class ImagenService {
 		return archivo;
 	}
 
-	private BufferedImage leer(MultipartFile archivo) {
-		try (InputStream entrada = archivo.getInputStream();
-				ImageInputStream imagenEntrada = ImageIO.createImageInputStream(entrada)) {
+	private BufferedImage leer(InputStream entrada, String nombre) {
+		try (ImageInputStream imagenEntrada = ImageIO.createImageInputStream(entrada)) {
 			Iterator<ImageReader> lectores = imagenEntrada == null ? null : ImageIO.getImageReaders(imagenEntrada);
 			if (lectores == null || !lectores.hasNext()) {
 				throw new ReglaNegocioException("Formato de imagen no soportado. Usá JPG, PNG, WebP o GIF.");
@@ -98,7 +105,7 @@ public class ImagenService {
 				lector.dispose();
 			}
 		} catch (IOException e) {
-			throw new ReglaNegocioException("No se pudo leer la imagen " + archivo.getOriginalFilename());
+			throw new ReglaNegocioException("No se pudo leer la imagen " + nombre);
 		}
 	}
 

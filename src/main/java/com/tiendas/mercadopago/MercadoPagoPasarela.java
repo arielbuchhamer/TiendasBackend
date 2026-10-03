@@ -33,6 +33,7 @@ import com.tiendas.pedidos.PedidoItem;
  * y no depende de qué endpoint se llamó primero.
  */
 @Component
+@MercadoPagoReal
 public class MercadoPagoPasarela implements PasarelaPago {
 
 	private static final int MAX_DESCRIPTOR_RESUMEN = 22;
