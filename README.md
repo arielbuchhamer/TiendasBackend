@@ -70,7 +70,8 @@ docker build -t tiendas-backend .    # imagen de producción (usuario sin privil
    - Mercado Pago: `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`.
    - Archivos: `ALMACENAMIENTO_TIPO=S3` + `ALMACENAMIENTO_S3_*` (un bucket **privado** por tienda).
    - Primer deploy: `TIENDA_ADMIN_INICIAL_USUARIO` / `TIENDA_ADMIN_INICIAL_CLAVE` (borrarlas después).
-   - Opcional: `FACTURACION_*`.
+   - Módulos opcionales: `FACTURACION_HABILITADA=true` + `FACTURACION_*` activa la facturación y muestra su
+     tarjeta en el panel; sin definir (o `false`), la tienda no tiene facturación y el panel no la muestra.
 5. Dominio: usar un subdominio del dominio de la tienda para la API (ej. `api.mitienda.com.ar`). Front y API bajo
    el mismo dominio permiten cookies `SameSite=Lax` (funcionan en Safari) y que el front lea la cookie CSRF.
    Recomendado: Cloudflare delante de la API para cachear las imágenes en el borde.
