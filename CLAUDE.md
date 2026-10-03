@@ -150,6 +150,45 @@ Perfil `local` (`application-local.yml`): valores de desarrollo, admin `admin`/`
 - Releases con tags semánticos `vX.Y.Z` desde `main`. Cada tienda despliega un tag.
 - Commits en español, descriptivos, en imperativo ("Agrega…", "Corrige…").
 
+### Historial lineal: nunca commits de merge
+
+El historial de `main` y `develop` es una línea recta. **No se hacen merges que generen commit de merge**;
+se integra con rebase, avance rápido (`--ff-only`) o cherry-pick. La única excepción es el commit inicial que
+unió el historial importado de BackTecnophones.
+
+```bash
+# 1. Nueva funcionalidad
+git checkout develop && git pull
+git checkout -b feature/mi-cambio
+# ...commits...
+
+# 2. Integrar a develop: primero rebase sobre develop actualizado, después avance rápido
+git fetch origin
+git rebase origin/develop                # resolver conflictos acá, en la feature
+git checkout develop && git pull
+git merge --ff-only feature/mi-cambio    # solo mueve el puntero; si no es posible, falla (rebasear de nuevo)
+git push origin develop
+git branch -d feature/mi-cambio
+
+# 3. Publicar una versión: main avanza hasta develop
+git checkout main && git pull
+git merge --ff-only develop
+git tag v1.2.0 && git push origin main v1.2.0
+
+# 4. Hotfix urgente sobre main: se corrige en main y se lleva a develop con cherry-pick
+git checkout main && git checkout -b hotfix/descripcion
+# ...commit...
+git checkout main && git merge --ff-only hotfix/descripcion && git push origin main
+git checkout develop && git cherry-pick <sha-del-hotfix> && git push origin develop
+```
+
+Configuración local recomendada (ya aplicada en este clon):
+`git config pull.rebase true`, `git config merge.ff only`, `git config rebase.autoStash true`.
+Con `merge.ff only`, un `git merge` que necesitaría commit de merge falla en lugar de crearlo.
+
+- No reescribir historia ya publicada de `main`. En `develop` solo con `git push --force-with-lease` y avisando.
+- En GitHub: proteger `main` y `develop` con "Require linear history" y permitir solo "Rebase and merge" en los PR.
+
 ## Pendientes conocidos
 
 - Migración de datos de TecnoPhones desde MongoDB (script ETL único) antes de mover esa tienda a este backend.
