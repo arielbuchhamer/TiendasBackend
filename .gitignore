@@ -57,8 +57,13 @@ build/
 hs_err_pid*
 replay_pid*
 
-# Local implementation notes for Codex / architectural context
-FACTURACION_ELECTRONICA_LOCAL.md
+### TiendasBackend ###
+# Secretos y configuración local: NUNCA se commitean
+.env
+.env.*
+!.env.example
+/config/
 
-# PDFs de comprobantes generados en runtime (contienen datos fiscales reales)
-/comprobantes-pdf/
+# Archivos subidos en desarrollo (imágenes, PDFs con datos fiscales)
+/datos/
+

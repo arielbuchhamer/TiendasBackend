@@ -1,0 +1,16 @@
+# Base de datos para desarrollo local. Spring Boot la levanta sola al ejecutar la app
+# (dependencia spring-boot-docker-compose); también se puede usar `docker compose up -d`.
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: tiendas
+      POSTGRES_USER: tiendas
+      POSTGRES_PASSWORD: tiendas
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-datos:/var/lib/postgresql
+
+volumes:
+  postgres-datos:

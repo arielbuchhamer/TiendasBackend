@@ -1,0 +1,22 @@
+# Perfil de desarrollo local: SPRING_PROFILES_ACTIVE=local
+# PostgreSQL lo levanta automáticamente Spring Boot con compose.yaml (requiere Docker).
+# Los secretos (Mercado Pago de prueba) van en el archivo .env (ver .env.example).
+
+tienda:
+  nombre: ${TIENDA_NOMBRE:Tienda Local}
+  frontend-url: ${TIENDA_FRONTEND_URL:http://localhost:5173}
+  api-url: ${TIENDA_API_URL:http://localhost:8080}
+  cors-origenes: ${TIENDA_CORS_ORIGENES:http://localhost:5173}
+  cookies:
+    secure: false # en local no hay HTTPS
+  admin-inicial:
+    usuario: ${TIENDA_ADMIN_INICIAL_USUARIO:admin}
+    clave: ${TIENDA_ADMIN_INICIAL_CLAVE:admin-local-123}
+
+mercadopago:
+  access-token: ${MP_ACCESS_TOKEN:configurar-en-env}
+  webhook-secret: ${MP_WEBHOOK_SECRET:configurar-en-env}
+
+logging:
+  level:
+    com.tiendas: debug

@@ -1,0 +1,149 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Configuración de TiendasBackend.
+# Todo lo que cambia entre tiendas o tiene secretos se toma de variables de entorno
+# (ver .env.example). Este archivo no debe contener credenciales ni datos de clientes.
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  application:
+    name: tiendas-backend
+  config:
+    # En desarrollo, las variables pueden definirse en un archivo .env (ignorado por git)
+    import: optional:file:.env[.properties]
+  threads:
+    virtual:
+      enabled: true # cada request en un hilo virtual: no se agotan hilos esperando a la base o a APIs externas
+
+  datasource:
+    # Railway expone PGHOST, PGPORT, PGDATABASE, PGUSER y PGPASSWORD en el servicio de PostgreSQL
+    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:tiendas}
+    username: ${PGUSER:tiendas}
+    password: ${PGPASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: 2
+      connection-timeout: 5000 # ms
+
+  jpa:
+    open-in-view: false # sin consultas lazy durante la serialización del JSON
+    hibernate:
+      ddl-auto: validate # el esquema lo maneja Flyway; Hibernate solo verifica que coincida
+    properties:
+      hibernate:
+        default_batch_fetch_size: 50 # colecciones LAZY se cargan en lote (evita N+1)
+        jdbc:
+          time_zone: UTC
+        order_updates: true
+
+  flyway:
+    locations: classpath:db/migration
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+  mvc:
+    problemdetails:
+      enabled: true
+
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: framework # Railway termina TLS: respeta X-Forwarded-* para IP y esquema
+  compression:
+    enabled: true
+    mime-types: application/json,application/problem+json
+    min-response-size: 1KB
+  error:
+    include-message: never
+    include-stacktrace: never
+  servlet:
+    session:
+      timeout: 8h
+      cookie:
+        name: SESION
+        http-only: true
+        secure: ${tienda.cookies.secure}
+        same-site: ${tienda.cookies.same-site}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true # /actuator/health/liveness y /readiness
+  info:
+    env:
+      enabled: false
+
+logging:
+  level:
+    org.hibernate.orm.deprecation: error
+
+# ─── Tienda ──────────────────────────────────────────────────────────────────
+tienda:
+  nombre: ${TIENDA_NOMBRE}
+  frontend-url: ${TIENDA_FRONTEND_URL}
+  api-url: ${TIENDA_API_URL}
+  moneda: ${TIENDA_MONEDA:ARS}
+  cors-origenes: ${TIENDA_CORS_ORIGENES}
+  envio:
+    domicilio-habilitado: ${TIENDA_ENVIO_DOMICILIO_HABILITADO:true}
+    retiro-habilitado: ${TIENDA_ENVIO_RETIRO_HABILITADO:true}
+    costo-fijo: ${TIENDA_ENVIO_COSTO_FIJO:0}
+  pedidos:
+    horas-vencimiento: ${TIENDA_PEDIDOS_HORAS_VENCIMIENTO:48}
+  cookies:
+    same-site: ${TIENDA_COOKIES_SAME_SITE:lax}
+    secure: ${TIENDA_COOKIES_SECURE:true}
+    dominio: ${TIENDA_COOKIES_DOMINIO:}
+  admin-inicial:
+    usuario: ${TIENDA_ADMIN_INICIAL_USUARIO:}
+    clave: ${TIENDA_ADMIN_INICIAL_CLAVE:}
+
+mercadopago:
+  access-token: ${MP_ACCESS_TOKEN}
+  webhook-secret: ${MP_WEBHOOK_SECRET}
+
+almacenamiento:
+  tipo: ${ALMACENAMIENTO_TIPO:LOCAL}
+  local:
+    directorio: ${ALMACENAMIENTO_LOCAL_DIRECTORIO:./datos/archivos}
+  s3:
+    endpoint: ${ALMACENAMIENTO_S3_ENDPOINT:}
+    region: ${ALMACENAMIENTO_S3_REGION:auto}
+    bucket: ${ALMACENAMIENTO_S3_BUCKET:}
+    access-key: ${ALMACENAMIENTO_S3_ACCESS_KEY:}
+    secret-key: ${ALMACENAMIENTO_S3_SECRET_KEY:}
+    path-style: ${ALMACENAMIENTO_S3_PATH_STYLE:false}
+
+facturacion:
+  habilitada: ${FACTURACION_HABILITADA:false}
+  punto-venta: ${FACTURACION_PUNTO_VENTA:1}
+  tipo-comprobante: ${FACTURACION_TIPO_COMPROBANTE:FACTURA_C}
+  moneda: ${FACTURACION_MONEDA:PES}
+  cotizacion: ${FACTURACION_COTIZACION:1}
+  alicuota-iva-default: ${FACTURACION_ALICUOTA_IVA_DEFAULT:IVA_21}
+  umbral-identificacion-consumidor-final: ${FACTURACION_UMBRAL_IDENTIFICACION_CONSUMIDOR_FINAL:10000000}
+  emisor:
+    cuit: ${FACTURACION_EMISOR_CUIT:}
+    razon-social: ${FACTURACION_EMISOR_RAZON_SOCIAL:}
+    condicion-iva: ${FACTURACION_EMISOR_CONDICION_IVA:}
+    domicilio: ${FACTURACION_EMISOR_DOMICILIO:}
+    ingresos-brutos: ${FACTURACION_EMISOR_INGRESOS_BRUTOS:}
+    inicio-actividades: ${FACTURACION_EMISOR_INICIO_ACTIVIDADES:}
+  pdf:
+    logo: ${FACTURACION_PDF_LOGO:}
+    color-acento: ${FACTURACION_PDF_COLOR_ACENTO:#4F46E5}
+  afrelay:
+    url: ${FACTURACION_AFRELAY_URL:}
+    token: ${FACTURACION_AFRELAY_TOKEN:}
