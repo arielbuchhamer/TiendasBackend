@@ -91,6 +91,11 @@ docker build -t tiendas-backend .    # imagen de producción (usuario sin privil
 
 Si falta una variable obligatoria, la aplicación **no arranca** y el log indica cuál.
 
+### Alternativa: varias tiendas en un servidor propio
+
+Para alojar varias tiendas sin costo en un único servidor (Oracle Cloud Always Free + Coolify, región São Paulo o
+Santiago), ver [docs/despliegue-oracle-coolify.md](docs/despliegue-oracle-coolify.md).
+
 ## API (`/api/v1`)
 
 Los errores siguen RFC 9457 (`application/problem+json`): `{ "status", "title", "detail", "errores"? }`.

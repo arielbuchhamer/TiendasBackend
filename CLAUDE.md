@@ -12,7 +12,8 @@ para todas — jamás con `if (tienda == "X")`, forks ni ramas por cliente.
 - Origen: `~/Dev/BackTecnophones` (MongoDB). **Es la producción actual de TecnoPhones: no modificarlo nunca.**
   Se puede leer como referencia.
 - Clientes previstos: TecnoPhones (celulares), una maderera (venta por m², metro, pie) y futuros rubros.
-- Deploy: Railway, un proyecto por tienda (API + PostgreSQL). Cada tienda fija el tag de versión que corre.
+- Deploy: Railway, un proyecto por tienda (API + PostgreSQL), o varias tiendas en un servidor propio con Coolify
+  (Oracle Cloud Always Free, ver `docs/despliegue-oracle-coolify.md`). Cada tienda fija la versión que corre.
 
 ## Comandos
 
