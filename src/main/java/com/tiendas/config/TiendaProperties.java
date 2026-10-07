@@ -33,6 +33,7 @@ public record TiendaProperties(
 		@Valid @NotNull @DefaultValue Envio envio,
 		@Valid @NotNull @DefaultValue Pedidos pedidos,
 		@Valid @NotNull @DefaultValue Cookies cookies,
+		@Valid @NotNull @DefaultValue Proxy proxy,
 		@DefaultValue AdminInicial adminInicial) {
 
 	public record Envio(
@@ -55,6 +56,15 @@ public record TiendaProperties(
 			 * subdominio (ej. "mitienda.com.ar" con la API en api.mitienda.com.ar). Vacío = dominio de la API.
 			 */
 			String dominio) {
+	}
+
+	public record Proxy(
+			/**
+			 * Header con la IP real del cliente puesto por un proxy de confianza (ej. "CF-Connecting-IP" con
+			 * Cloudflare delante). Solo es seguro si el servidor acepta tráfico únicamente de ese proxy; si no, el
+			 * cliente podría inventarlo. Vacío = IP de la conexión, resuelta por Tomcat desde X-Forwarded-For.
+			 */
+			@Pattern(regexp = "[A-Za-z0-9-]*") String headerIpCliente) {
 	}
 
 	/** Usuario administrador que se crea al arrancar si la base no tiene ningún usuario. */

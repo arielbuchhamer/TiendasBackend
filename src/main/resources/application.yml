@@ -55,7 +55,10 @@ spring:
 server:
   port: ${PORT:8080}
   shutdown: graceful
-  forward-headers-strategy: framework # Railway termina TLS: respeta X-Forwarded-* para IP y esquema
+  # El proxy (Railway, Traefik) termina TLS. "native" usa el RemoteIpValve de Tomcat: recorre X-Forwarded-For de
+  # derecha a izquierda saltando solo proxies de red interna, así el cliente no puede inventar su IP poniendo un
+  # valor a la izquierda (con "framework" se tomaba el primero). Proxies de confianza: server.tomcat.remoteip.*
+  forward-headers-strategy: native
   compression:
     enabled: true
     mime-types: application/json,application/problem+json
@@ -102,6 +105,8 @@ tienda:
     costo-fijo: ${TIENDA_ENVIO_COSTO_FIJO:0}
   pedidos:
     horas-vencimiento: ${TIENDA_PEDIDOS_HORAS_VENCIMIENTO:48}
+  proxy:
+    header-ip-cliente: ${TIENDA_PROXY_HEADER_IP_CLIENTE:}
   cookies:
     same-site: ${TIENDA_COOKIES_SAME_SITE:lax}
     secure: ${TIENDA_COOKIES_SECURE:true}

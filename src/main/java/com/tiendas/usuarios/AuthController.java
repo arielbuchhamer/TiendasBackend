@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.tiendas.config.IpCliente;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -37,19 +39,22 @@ public class AuthController {
 	private final CookieCsrfTokenRepository csrfTokenRepository;
 	private final LimitadorIntentosLogin limitador;
 	private final UsuarioService usuarioService;
+	private final IpCliente ipCliente;
 
 	public AuthController(AuthenticationManager authenticationManager, SecurityContextRepository securityContextRepository,
-			CookieCsrfTokenRepository csrfTokenRepository, LimitadorIntentosLogin limitador, UsuarioService usuarioService) {
+			CookieCsrfTokenRepository csrfTokenRepository, LimitadorIntentosLogin limitador, UsuarioService usuarioService,
+			IpCliente ipCliente) {
 		this.authenticationManager = authenticationManager;
 		this.securityContextRepository = securityContextRepository;
 		this.csrfTokenRepository = csrfTokenRepository;
 		this.limitador = limitador;
 		this.usuarioService = usuarioService;
+		this.ipCliente = ipCliente;
 	}
 
 	@PostMapping("/login")
 	public Usuario login(@Valid @RequestBody LoginRequest login, HttpServletRequest request, HttpServletResponse response) {
-		String ip = request.getRemoteAddr();
+		String ip = ipCliente.de(request);
 		if (limitador.estaBloqueado(login.username(), ip)) {
 			throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
 					"Demasiados intentos fallidos. Esperá unos minutos y volvé a intentar.");

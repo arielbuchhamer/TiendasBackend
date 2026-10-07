@@ -83,7 +83,9 @@ docker build -t tiendas-backend .    # imagen de producción (usuario sin privil
      tarjeta en el panel; sin definir (o `false`), la tienda no tiene facturación y el panel no la muestra.
 5. Dominio: usar un subdominio del dominio de la tienda para la API (ej. `api.mitienda.com.ar`). Front y API bajo
    el mismo dominio permiten cookies `SameSite=Lax` (funcionan en Safari) y que el front lea la cookie CSRF.
-   Recomendado: Cloudflare delante de la API para cachear las imágenes en el borde.
+   Recomendado: Cloudflare delante de la API para cachear las imágenes en el borde. En Railway dejar
+   `TIENDA_PROXY_HEADER_IP_CLIENTE` vacío: el servidor sigue accesible sin pasar por Cloudflare y ese header
+   podría falsificarse.
 6. En Mercado Pago → Webhooks: URL `https://api.mitienda.com.ar/api/v1/webhooks/mercadopago`, evento *Pagos*;
    copiar la clave secreta en `MP_WEBHOOK_SECRET`.
 
