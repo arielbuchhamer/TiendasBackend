@@ -27,9 +27,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Pedido de compra. En el checkout el frontend envía solo cliente, entrega, dirección e items
- * (variante y cantidad); todo lo demás (precios, totales, estado) lo calcula el servidor y se ignora
- * si llega en el request.
+ * Pedido de compra. En el checkout el frontend envía solo cliente, entrega, dirección, items (variante y
+ * cantidad) y opcionalmente un código de cupón; todo lo demás (precios, descuento, totales, estado) lo
+ * calcula el servidor y se ignora si llega en el request.
  */
 @Getter
 @Setter
@@ -65,6 +65,21 @@ public class Pedido extends EntidadBase {
 
 	@JsonProperty(access = Access.READ_ONLY)
 	private BigDecimal costoEnvio;
+
+	/**
+	 * Código de descuento que escribió el cliente (opcional). Es lo único del cupón que llega en el request:
+	 * si es válido, el servidor lo guarda normalizado junto con el descuento calculado.
+	 */
+	@Size(max = 60)
+	private String cuponCodigo;
+
+	@JsonProperty(access = Access.READ_ONLY)
+	private Long cuponId;
+
+	/** Descuento del cupón, ya restado del total. */
+	@JsonProperty(access = Access.READ_ONLY)
+	@Column(nullable = false)
+	private BigDecimal descuento = BigDecimal.ZERO;
 
 	@JsonProperty(access = Access.READ_ONLY)
 	private BigDecimal total;

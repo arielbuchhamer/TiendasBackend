@@ -13,6 +13,9 @@ tienda:
     usuario: ${TIENDA_ADMIN_INICIAL_USUARIO:admin}
     clave: ${TIENDA_ADMIN_INICIAL_CLAVE:admin-local-123}
 
+descuentos:
+  habilitada: ${DESCUENTOS_HABILITADA:true} # en local se desarrolla con el módulo activo
+
 mercadopago:
   # Por defecto los pagos se simulan (se aprueban al instante, sin Mercado Pago). Para probar con el
   # sandbox real: MP_SIMULADO=false + credenciales de prueba en .env + API expuesta (ej. ngrok).

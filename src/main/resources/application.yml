@@ -131,6 +131,9 @@ almacenamiento:
     secret-key: ${ALMACENAMIENTO_S3_SECRET_KEY:}
     path-style: ${ALMACENAMIENTO_S3_PATH_STYLE:false}
 
+descuentos:
+  habilitada: ${DESCUENTOS_HABILITADA:false}
+
 facturacion:
   habilitada: ${FACTURACION_HABILITADA:false}
   punto-venta: ${FACTURACION_PUNTO_VENTA:1}
