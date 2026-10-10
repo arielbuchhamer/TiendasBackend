@@ -51,7 +51,7 @@ public class SecurityConfig {
 				.csrf(csrf -> csrf
 						.spa()
 						.csrfTokenRepository(csrfTokenRepository)
-						.ignoringRequestMatchers("/api/v1/webhooks/**", "/api/v1/checkout"))
+						.ignoringRequestMatchers("/api/v1/webhooks/**", "/api/v1/checkout", "/api/v1/checkout/cupon"))
 				.securityContext(contexto -> contexto.securityContextRepository(securityContextRepository))
 				.authorizeHttpRequests(rutas -> rutas
 						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
@@ -62,7 +62,7 @@ public class SecurityConfig {
 								"/api/v1/productos/**",
 								"/api/v1/imagenes/**",
 								"/api/v1/comprobantes/*/pdf").permitAll()
-						.requestMatchers(POST, "/api/v1/checkout", "/api/v1/webhooks/mercadopago").permitAll()
+						.requestMatchers(POST, "/api/v1/checkout", "/api/v1/checkout/cupon", "/api/v1/webhooks/mercadopago").permitAll()
 						.requestMatchers("/api/v1/auth/**").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/health/**", "/error").permitAll()
 						.anyRequest().denyAll())

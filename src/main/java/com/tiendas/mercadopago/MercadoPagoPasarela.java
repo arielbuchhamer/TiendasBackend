@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
@@ -123,6 +124,9 @@ public class MercadoPagoPasarela implements PasarelaPago {
 	}
 
 	private List<PreferenceItemRequest> items(Pedido pedido) {
+		if (pedido.getDescuento().signum() > 0) {
+			return List.of(itemConDescuento(pedido));
+		}
 		List<PreferenceItemRequest> items = new ArrayList<>();
 		for (PedidoItem item : pedido.getItems()) {
 			// MP solo acepta cantidades enteras: si la cantidad tiene decimales (ej. 2,5 m²) se envía una
@@ -152,6 +156,26 @@ public class MercadoPagoPasarela implements PasarelaPago {
 					.build());
 		}
 		return items;
+	}
+
+	/**
+	 * MP no acepta ítems con precio negativo para restar el descuento: si hay cupón se cobra un único ítem
+	 * por el total (productos + envío - descuento), con el detalle de la compra en la descripción.
+	 */
+	private PreferenceItemRequest itemConDescuento(Pedido pedido) {
+		String detalle = pedido.getItems().stream()
+				.map(item -> item.getCantidad().stripTrailingZeros().toPlainString() + " x " + item.getProductoNombre())
+				.collect(Collectors.joining(", "));
+		return PreferenceItemRequest.builder()
+				.id("PEDIDO")
+				.title(recortar("Compra en " + tienda.nombre() + " (cupón " + pedido.getCuponCodigo() + ")", 250))
+				.description(recortar(detalle, 250))
+				.pictureUrl(pedido.getItems().getFirst().getImagenId() == null ? null
+						: tienda.apiUrl() + "/api/v1/imagenes/" + pedido.getItems().getFirst().getImagenId() + "/tarjeta")
+				.quantity(1)
+				.unitPrice(pedido.getTotal())
+				.currencyId(pedido.getMoneda())
+				.build();
 	}
 
 	private static String recortar(String texto, int maximo) {
