@@ -58,6 +58,7 @@ Paquetes **por funcionalidad** (no por capa técnica), en `src/main/java/com/tie
 | `pedidos` | Pedido, items, pagos, checkout, registro de pagos, vencimiento, `PasarelaPago` (interfaz) |
 | `mercadopago` | Implementación de `PasarelaPago`, webhook y firma HMAC |
 | `facturacion` | ARCA vía AFRelay; solo se activa con `facturacion.habilitada=true` (`@FacturacionHabilitada`) |
+| `descuentos` | Cupones (códigos de descuento) y su cálculo en el checkout; módulo opcional (`descuentos.habilitada`) |
 | `desarrollo` | Solo perfil `local`: `DatosEjemplo` (catálogo HA!Tablas) y `PasarelaSimulada` (pagos sin MP) |
 
 Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (reglas y transacciones) →
@@ -70,7 +71,8 @@ Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (re
   - Datos internos: `@JsonIgnore` (hashes, claves de almacenamiento, back-references).
   - **Los services nunca persisten la entidad recibida en el body.** Siempre copian los campos permitidos sobre una
     entidad nueva o cargada de la base (ver `ProductoService#copiarDatos`). Esto evita mass assignment.
-  - Solo se usan `record` para entradas/salidas que no son entidades (ej. `LoginRequest`, `InfoTienda`, `PagoInformado`).
+  - Solo se usan `record` para entradas/salidas que no son entidades (ej. `LoginRequest`, `InfoTienda`, `PagoInformado`,
+    `CheckoutService.Cotizacion`).
 - **Relaciones en JSON por id**: `categoria.rubroId`, `producto.categoriaId`, `item.varianteId` son columnas simples.
   Las asociaciones JPA (`@ManyToOne`) se usan solo donde hace falta navegar, y van `LAZY` + `@JsonIgnore`.
 - **Colecciones LAZY + OSIV desactivado**: el service que devuelve una entidad inicializa sus colecciones dentro de
@@ -95,7 +97,8 @@ Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (re
 
 - Lista blanca de rutas en `SecurityConfig`; todo lo no declarado se deniega. `/api/v1/admin/**` requiere `ADMIN`.
   Al agregar un endpoint público, declararlo explícitamente ahí.
-- Sesión por cookie HttpOnly (`SESION`), CSRF con cookie `XSRF-TOKEN` + header `X-XSRF-TOKEN` (excepto checkout y webhook).
+- Sesión por cookie HttpOnly (`SESION`), CSRF con cookie `XSRF-TOKEN` + header `X-XSRF-TOKEN` (excepto checkout,
+  `checkout/cupon` y webhook: son anónimos).
 - Login: BCrypt(12), cambio de id de sesión, límite de intentos por usuario e IP.
 - Webhook de MP: firma HMAC obligatoria + consulta del pago a la API de MP (nunca confiar en el body).
 - Errores: nunca exponer mensajes internos; `ReglaNegocioException` (422) para mensajes pensados para el usuario.
@@ -123,13 +126,17 @@ en `application.yml` con `${VARIABLE}` + documentarlo en `.env.example`.
 
 ### Módulos opcionales
 
-Una funcionalidad opcional (hoy: facturación) se activa por instancia con una sola propiedad
-(`FACTURACION_HABILITADA`). Esa misma propiedad:
+Una funcionalidad opcional (hoy: facturación y descuentos) se activa por instancia con una sola propiedad
+(`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`). Esa misma propiedad:
 1. crea o no los beans y endpoints del módulo (anotación condicional, ej. `@FacturacionHabilitada`), y
 2. se informa al frontend en `GET /api/v1/tienda` → `modulos`, para que el panel muestre u oculte la sección.
 
 No crear flags de "visibilidad" separados del flag que activa el módulo: podrían quedar desincronizados.
 Para un módulo nuevo: propiedad `xxx.habilitada`, anotación condicional propia y campo en `TiendaController.Modulos`.
+
+Excepción en descuentos: `CuponService` y la entidad `Cupon` existen siempre (el checkout los necesita y la tabla
+siempre está); con el módulo apagado `CuponService#aplicar` rechaza cualquier código y solo el ABM del panel
+(`CuponController`, `@DescuentosHabilitada`) deja de existir.
 
 Perfil `local` (`application-local.yml`): valores de desarrollo, admin `admin`/`admin-local-123`, cookies sin `secure`,
 catálogo de ejemplo y pagos simulados (`MP_SIMULADO`, por defecto `true`).
@@ -138,6 +145,40 @@ catálogo de ejemplo y pagos simulados (`MP_SIMULADO`, por defecto `true`).
 `mercadopago.simulado=true`; las clases reales de MP llevan `@MercadoPagoReal` (se apagan con esa propiedad). Si la
 propiedad se activa fuera de `local`, no queda ninguna `PasarelaPago` y la app no arranca. No romper ese doble candado:
 todo código del paquete `desarrollo` debe llevar `@Profile("local")`.
+
+### Descuentos (cupones) y Mercado Pago
+
+Paquete `descuentos`. El dueño crea cupones desde el panel (`/api/v1/admin/cupones`) y el cliente escribe el código
+en el checkout.
+
+- **Tipos** (`TipoCupon`): `PORCENTAJE` (con `tope` opcional en pesos), `MONTO_FIJO` (nunca más que lo alcanzado) y
+  `ENVIO_GRATIS` (solo con entrega a domicilio; descuenta el costo de envío que cobra la web).
+- **Condiciones** (opcionales): vigencia `desde`/`hasta` (`hasta` es exclusivo), compra mínima, usos totales, usos por
+  cliente (por email), solo primera compra, `activo`. **Alcance**: rubros, categorías o productos
+  (`cupon_rubro`/`cupon_categoria`/`cupon_producto`); sin ninguno, toda la tienda. Esas tablas no tienen FK a
+  catálogo a propósito: borrar un producto no debe fallar ni convertir el cupón en general.
+- **El front solo manda `cuponCodigo`** en `POST /checkout`. `CheckoutService#armarPedido` valida y calcula con
+  `CuponService#aplicar`: `total = subtotal + costoEnvio - descuento`. El pedido guarda `cuponId`, `cuponCodigo`
+  (normalizado en mayúsculas) y `descuento` (READ_ONLY). Un total ≤ 0 se rechaza (MP no cobra $0).
+- **`POST /api/v1/checkout/cupon`** (público): mismo cálculo sin guardar nada, para mostrar el descuento antes de
+  pagar. El email es opcional; las condiciones por cliente se vuelven a validar al confirmar. Los códigos inexistentes
+  cuentan para un límite por IP (`LimitadorIntentosCupon`, 15 cada 15 min → 429) para que no se puedan adivinar.
+- **Usos**: cuentan solo pedidos pagados (`APROBADO` o `REQUIERE_REVISION`); pendientes, vencidos o rechazados no
+  gastan el cupón. No hay bloqueo: si dos clientes pagan a la vez el último uso, se aprueban ambos (excedente
+  aceptado a propósito). Un cupón con pedidos no se borra, se pausa (las métricas salen de esos pedidos).
+- **Envío gratis sin costo en la web**: hay tiendas que cobran $0 de envío y lo coordinan aparte (ej. HA!Tablas).
+  Ahí el descuento es 0 y el pedido solo queda marcado con el cupón. Invariante: un pedido con cupón y
+  `descuento = 0` siempre es de envío gratis (`aplicar` rechaza porcentaje/monto que no descuenten nada); el panel
+  se apoya en eso para mostrar "Envío gratis".
+
+**Al tocar Mercado Pago, tener en cuenta:**
+- MP no acepta ítems con precio negativo. Si `pedido.descuento > 0`, `MercadoPagoPasarela#items` manda **un solo
+  ítem** (`id = "PEDIDO"`, título "Compra en {tienda} (cupón X)", descripción con el detalle) por `pedido.total`,
+  que ya incluye envío y descuento. Sin descuento se mandan los ítems y el envío como siempre.
+- `PedidoService#montoCubreElPedido` compara el pago contra `pedido.total` (ya descontado). Si se cambia cómo se
+  arma la preferencia, la suma de los ítems tiene que seguir dando exactamente `pedido.total`.
+- `PasarelaSimulada` (local) aprueba por `pedido.total`, así que en local el descuento ya se prueba completo.
+  **Pendiente: probar el ítem consolidado contra el sandbox real de MP** (nunca se probó con MP real).
 
 ### Frontends
 
@@ -209,3 +250,5 @@ Con `merge.ff only`, un `git merge` que necesitaría commit de merge falla en lu
 - QR fiscal en el PDF de factura (RG 4892) y factura automática desde un pedido aprobado.
 - Estados de despacho del pedido (en preparación, enviado, entregado).
 - Limpieza de imágenes huérfanas en el almacenamiento.
+- Descuentos: probar con el sandbox de MP el ítem único que se manda cuando hay cupón (ver "Descuentos").
+- Descuentos (etapa 2, si se pide): promociones automáticas sin código (ej. 2x1, descuento por cantidad).
