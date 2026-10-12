@@ -68,7 +68,9 @@ public class MercadoPagoPasarela implements PasarelaPago {
 						.pending(tienda.frontendUrl() + mercadoPago.rutaPendiente())
 						.failure(tienda.frontendUrl() + mercadoPago.rutaError())
 						.build())
-				.autoReturn("approved")
+				// MP rechaza auto_return si la URL de retorno no es pública (ej. http://localhost en desarrollo);
+				// sin auto_return el comprador vuelve con el botón "Volver al sitio"
+				.autoReturn(tienda.frontendUrl().startsWith("https://") ? "approved" : null)
 				.notificationUrl(tienda.apiUrl() + "/api/v1/webhooks/mercadopago")
 				.statementDescriptor(recortar(tienda.nombre(), MAX_DESCRIPTOR_RESUMEN))
 				// El link de pago vence junto con el pedido
