@@ -18,12 +18,15 @@ para todas — jamás con `if (tienda == "X")`, forks ni ramas por cliente.
 ## Comandos
 
 ```bash
-SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run   # levanta PostgreSQL (compose.yaml) + app en :8080
+SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run   # levanta PostgreSQL y Mailpit (compose.yaml) + app en :8080
 ./mvnw compile                                         # compilar
 ./mvnw package                                         # jar en target/
 docker build -t tiendas-backend .                      # imagen de producción
-docker compose up -d / docker compose stop             # solo la base local
+docker compose up -d / docker compose stop             # solo la base local y Mailpit
 ```
+
+Mailpit (http://localhost:8025) atrapa los mails que manda la app en local: no salen a internet. Si la base ya
+estaba levantada, Spring no arranca servicios nuevos del compose: `docker compose up -d mailpit`.
 
 Verificar que funciona: levantar con perfil `local` y probar con curl (`/actuator/health`, login
 `admin`/`admin-local-123`). Para requests que modifican datos hay que mandar la cookie `XSRF-TOKEN` en el header
@@ -59,6 +62,8 @@ Paquetes **por funcionalidad** (no por capa técnica), en `src/main/java/com/tie
 | `mercadopago` | Implementación de `PasarelaPago`, webhook y firma HMAC |
 | `facturacion` | ARCA vía AFRelay; solo se activa con `facturacion.habilitada=true` (`@FacturacionHabilitada`) |
 | `descuentos` | Cupones (códigos de descuento) y su cálculo en el checkout; módulo opcional (`descuentos.habilitada`) |
+| `envios` | Zonas de envío por código postal, retiro y envío gratis desde un monto; módulo opcional (`envios.habilitada`) |
+| `notificaciones` | Mails de venta pagada al vendedor y al cliente (SMTP + Thymeleaf); módulo opcional (`notificaciones.habilitada`) |
 | `desarrollo` | Solo perfil `local`: `DatosEjemplo` (catálogo HA!Tablas) y `PasarelaSimulada` (pagos sin MP) |
 
 Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (reglas y transacciones) →
@@ -126,15 +131,16 @@ en `application.yml` con `${VARIABLE}` + documentarlo en `.env.example`.
 
 ### Módulos opcionales
 
-Una funcionalidad opcional (hoy: facturación y descuentos) se activa por instancia con una sola propiedad
-(`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`). Esa misma propiedad:
+Una funcionalidad opcional (hoy: facturación, descuentos, envíos y notificaciones) se activa por instancia con una
+sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`, `NOTIFICACIONES_HABILITADA`).
+Esa misma propiedad:
 1. crea o no los beans y endpoints del módulo (anotación condicional, ej. `@FacturacionHabilitada`), y
 2. se informa al frontend en `GET /api/v1/tienda` → `modulos`, para que el panel muestre u oculte la sección.
 
 No crear flags de "visibilidad" separados del flag que activa el módulo: podrían quedar desincronizados.
 Para un módulo nuevo: propiedad `xxx.habilitada`, anotación condicional propia y campo en `TiendaController.Modulos`.
 
-Excepción en descuentos: `CuponService` y la entidad `Cupon` existen siempre (el checkout los necesita y la tabla
+Excepción en descuentos y envíos: `CuponService`, `EnvioService` y sus entidades existen siempre (el checkout los necesita y la tabla
 siempre está); con el módulo apagado `CuponService#aplicar` rechaza cualquier código y solo el ABM del panel
 (`CuponController`, `@DescuentosHabilitada`) deja de existir.
 
@@ -179,6 +185,49 @@ en el checkout.
   arma la preferencia, la suma de los ítems tiene que seguir dando exactamente `pedido.total`.
 - `PasarelaSimulada` (local) aprueba por `pedido.total`, así que en local el descuento ya se prueba completo.
   **Pendiente: probar el ítem consolidado contra el sandbox real de MP** (nunca se probó con MP real).
+
+### Envíos por zona
+
+Paquete `envios`. Con el módulo apagado, el checkout usa el costo único de `tienda.envio` (como antes).
+
+- **Zonas** (`ZonaEnvio`): nombre, `codigosPostales` (lista de códigos de 4 dígitos o rangos: `"3164, 3100-3299"`;
+  vacía = resto del país), `precio` o `costoAConvenir` (no se cobra en la web), plazo `diasMin`/`diasMax`, `activa`,
+  `orden`. Para un CP se usa la primera zona activa (por `orden`) que lo incluye; si ninguna, la zona sin códigos.
+  Los CP se comparan por sus 4 dígitos (acepta CPA, ej. "A3164ABC").
+- **Ajustes** (`AjustesEnvio`, una fila): retiro habilitado y su texto, `envioGratisDesde` (sobre el subtotal; no
+  aplica a zonas a convenir).
+- **Checkout**: el front manda `entrega`, la dirección (con CP) y opcionalmente `envioOpcion` (`RETIRO` o
+  `ZONA-{id}`). `EnvioService#elegir` valida la opción contra el CP y devuelve el precio; el pedido guarda
+  `envioOpcion`, `envioDescripcion` (lo que vio el cliente) y `envioAConvenir`. El envío se calcula antes que el
+  cupón (el de envío gratis descuenta ese costo).
+- **Endpoints**: `GET /api/v1/envios` y `POST /api/v1/envios/cotizar` (públicos, sin CSRF) para el calculador del
+  front; ABM en `/api/v1/admin/envios/zonas` y `/api/v1/admin/envios/ajustes`.
+- **Peso y medidas** (`Medidas`, embebido en `Producto` y `Categoria`; la categoría es el valor por defecto). Hoy no
+  cambian el precio: quedan para cotizar con un correo.
+- Nombres con "AConvenir": la estrategia de nombres de Hibernate no separa dos mayúsculas seguidas, por eso esos
+  campos llevan `@Column(name = ...)` explícito.
+
+**Próxima etapa: Correo Argentino (MiCorreo API).** La idea es un tipo de zona "Correo Argentino" cuyo precio y plazo
+salen de `POST /rates` (CP origen/destino, peso y medidas), con opciones a domicilio y a sucursal (`/agencies`), y un
+botón en la venta que da de alta el envío (`/shipping/import`). El rótulo oficial lo genera MiCorreo después de
+pagar el envío; el PDF automático por API es de Paq.ar y requiere acuerdo comercial. Las zonas fijas siguen sirviendo
+para reparto propio, "a convenir" y como respaldo si el Correo no responde.
+
+### Notificaciones por mail
+
+Paquete `notificaciones`. `PedidoService` publica `PedidoPagado` al aprobar un pedido (o al dejarlo en revisión);
+`CorreoVentas` lo escucha **después del commit** y manda en un hilo virtual: un SMTP lento o caído nunca demora ni
+revierte el pago (los errores quedan en el log).
+
+- Aviso al vendedor (`NOTIFICACIONES_AVISOS_VENDEDOR`, con reply-to al cliente) y confirmación al cliente
+  (`NOTIFICACIONES_MAIL_CLIENTE`). Un pedido en revisión solo avisa al vendedor.
+- Plantillas en `src/main/resources/mails/*.html` (Thymeleaf standalone, sin la integración web): HTML de mail
+  (tablas y estilos en línea). Los datos llegan como mapas desde `VistaPedido` (montos, fechas en hora argentina,
+  links de WhatsApp); Thymeleaf standalone no lee accessors de records.
+- Marca por configuración, nada en el código: remitente, logo (recurso de Spring, se adjunta embebido con
+  `cid:logo`), color, WhatsApp de la tienda y el texto de "próximo paso" para el cliente.
+- SMTP con las propiedades estándar `spring.mail.*` (variables `MAIL_*`). En el perfil local va a Mailpit.
+- En el `.env` local los acentos van escapados (`\u00e9`): Spring lee ese archivo como `.properties` (ISO-8859-1).
 
 ### Frontends
 
@@ -251,4 +300,5 @@ Con `merge.ff only`, un `git merge` que necesitaría commit de merge falla en lu
 - Estados de despacho del pedido (en preparación, enviado, entregado).
 - Limpieza de imágenes huérfanas en el almacenamiento.
 - Descuentos: probar con el sandbox de MP el ítem único que se manda cuando hay cupón (ver "Descuentos").
+- Envíos: integrar la cotización y el alta de envíos de Correo Argentino (ver "Envíos por zona").
 - Descuentos (etapa 2, si se pide): promociones automáticas sin código (ej. 2x1, descuento por cantidad).
