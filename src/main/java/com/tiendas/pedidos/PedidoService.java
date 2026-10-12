@@ -13,6 +13,7 @@ import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -39,12 +40,14 @@ public class PedidoService {
 	private final PedidoRepository pedidoRepository;
 	private final PagoRepository pagoRepository;
 	private final VarianteRepository varianteRepository;
+	private final ApplicationEventPublisher eventos;
 
 	public PedidoService(PedidoRepository pedidoRepository, PagoRepository pagoRepository,
-			VarianteRepository varianteRepository) {
+			VarianteRepository varianteRepository, ApplicationEventPublisher eventos) {
 		this.pedidoRepository = pedidoRepository;
 		this.pagoRepository = pagoRepository;
 		this.varianteRepository = varianteRepository;
+		this.eventos = eventos;
 	}
 
 	// ─── Panel de administración ────────────────────────────────────────
@@ -136,6 +139,7 @@ public class PedidoService {
 			log.warn("Pedido {}: el pago {} ({} {}) no coincide con el total ({} {})", pedido.getCodigo(),
 					pago.idExterno(), pago.monto(), pago.moneda(), pedido.getTotal(), pedido.getMoneda());
 			pedido.setEstado(EstadoPedido.REQUIERE_REVISION);
+			eventos.publishEvent(new PedidoPagado(pedido.getId(), true));
 			return;
 		}
 
@@ -149,12 +153,14 @@ public class PedidoService {
 		if (!hayStock) {
 			log.warn("Pedido {} pagado sin stock suficiente: requiere revisión", pedido.getCodigo());
 			pedido.setEstado(EstadoPedido.REQUIERE_REVISION);
+			eventos.publishEvent(new PedidoPagado(pedido.getId(), true));
 			return;
 		}
 
 		variantes.forEach(v -> v.setStock(v.getStock().subtract(cantidades.get(v.getId()))));
 		pedido.setEstado(EstadoPedido.APROBADO);
 		pedido.setAprobadoEn(Instant.now());
+		eventos.publishEvent(new PedidoPagado(pedido.getId(), false));
 	}
 
 	private static boolean montoCubreElPedido(Pedido pedido, PagoInformado pago) {

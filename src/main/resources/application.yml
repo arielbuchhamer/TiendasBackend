@@ -35,6 +35,19 @@ spring:
           time_zone: UTC
         order_updates: true
 
+  # Servidor SMTP para las notificaciones (Gmail, Brevo, el correo del dominio…). Sin host, no se mandan mails.
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:true}
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+
   flyway:
     locations: classpath:db/migration
 
@@ -136,6 +149,16 @@ descuentos:
 
 envios:
   habilitada: ${ENVIOS_HABILITADA:false}
+
+notificaciones:
+  habilitada: ${NOTIFICACIONES_HABILITADA:false}
+  remitente: ${NOTIFICACIONES_REMITENTE:}
+  avisos-vendedor: ${NOTIFICACIONES_AVISOS_VENDEDOR:}
+  mail-cliente: ${NOTIFICACIONES_MAIL_CLIENTE:true}
+  logo: ${NOTIFICACIONES_LOGO:}
+  color-acento: ${NOTIFICACIONES_COLOR_ACENTO:#1c1917}
+  whatsapp: ${NOTIFICACIONES_WHATSAPP:}
+  proximos-pasos: ${NOTIFICACIONES_PROXIMOS_PASOS:Te vamos a escribir para coordinar la entrega.}
 
 facturacion:
   habilitada: ${FACTURACION_HABILITADA:false}
