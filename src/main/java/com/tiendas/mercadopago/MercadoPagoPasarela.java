@@ -149,7 +149,7 @@ public class MercadoPagoPasarela implements PasarelaPago {
 		if (pedido.getCostoEnvio().compareTo(BigDecimal.ZERO) > 0) {
 			items.add(PreferenceItemRequest.builder()
 					.id("ENVIO")
-					.title("Envío a domicilio")
+					.title(recortar(pedido.getEnvioDescripcion() != null ? pedido.getEnvioDescripcion() : "Envío a domicilio", 250))
 					.quantity(1)
 					.unitPrice(pedido.getCostoEnvio())
 					.currencyId(pedido.getMoneda())

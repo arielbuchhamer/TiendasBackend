@@ -3,7 +3,9 @@ package com.tiendas.catalogo;
 import com.tiendas.comun.EntidadBase;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -25,4 +27,9 @@ public class Categoria extends EntidadBase {
 	private String nombre;
 
 	private int orden;
+
+	/** Peso y medidas por defecto de los productos de la categoría (ej. una tabla de picada típica). */
+	@Valid
+	@Embedded
+	private Medidas medidas;
 }

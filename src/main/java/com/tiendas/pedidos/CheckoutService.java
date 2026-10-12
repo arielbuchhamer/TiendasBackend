@@ -25,6 +25,8 @@ import com.tiendas.descuentos.CuponService;
 import com.tiendas.descuentos.CuponService.CuponAplicado;
 import com.tiendas.descuentos.CuponService.LineaCompra;
 import com.tiendas.descuentos.TipoCupon;
+import com.tiendas.envios.EnvioService;
+import com.tiendas.envios.EnvioService.OpcionEnvio;
 
 /**
  * Inicia una compra: valida el carrito contra la base, calcula precios y totales en el servidor
@@ -41,7 +43,7 @@ public class CheckoutService {
 
 	/** Importes de un carrito con un cupón aplicado, para mostrarlos antes de pagar. */
 	public record Cotizacion(String cuponCodigo, TipoCupon tipo, BigDecimal subtotal, BigDecimal costoEnvio,
-			BigDecimal descuento, BigDecimal total) {
+			String envioDescripcion, boolean envioAConvenir, BigDecimal descuento, BigDecimal total) {
 	}
 
 	private final VarianteRepository varianteRepository;
@@ -50,16 +52,18 @@ public class CheckoutService {
 	private final TransactionTemplate transaccion;
 	private final TiendaProperties tienda;
 	private final CuponService cuponService;
+	private final EnvioService envioService;
 
 	public CheckoutService(VarianteRepository varianteRepository, PedidoRepository pedidoRepository,
 			PasarelaPago pasarelaPago, TransactionTemplate transaccion, TiendaProperties tienda,
-			CuponService cuponService) {
+			CuponService cuponService, EnvioService envioService) {
 		this.varianteRepository = varianteRepository;
 		this.pedidoRepository = pedidoRepository;
 		this.pasarelaPago = pasarelaPago;
 		this.transaccion = transaccion;
 		this.tienda = tienda;
 		this.cuponService = cuponService;
+		this.envioService = envioService;
 	}
 
 	/** @param ip IP del comprador, para frenar a quien prueba códigos de cupón al azar */
@@ -83,11 +87,18 @@ public class CheckoutService {
 	 * nada. No exige los datos del cliente: si falta el email, las condiciones por cliente se validan recién
 	 * al confirmar la compra.
 	 */
-	public Cotizacion cotizar(String cuponCodigo, String email, TipoEntrega entrega, List<PedidoItem> items, String ip) {
+	public Cotizacion cotizar(String cuponCodigo, String email, TipoEntrega entrega, String codigoPostal,
+			String envioOpcion, List<PedidoItem> items, String ip) {
 		Pedido solicitud = new Pedido();
 		solicitud.setCuponCodigo(cuponCodigo);
 		solicitud.setEntrega(entrega);
+		solicitud.setEnvioOpcion(envioOpcion);
 		solicitud.setItems(items);
+		if (StringUtils.hasText(codigoPostal)) {
+			DireccionEnvio direccion = new DireccionEnvio();
+			direccion.setCodigoPostal(codigoPostal);
+			solicitud.setDireccion(direccion);
+		}
 		if (StringUtils.hasText(email)) {
 			DatosCliente cliente = new DatosCliente();
 			cliente.setEmail(email);
@@ -95,7 +106,8 @@ public class CheckoutService {
 		}
 		Pedido pedido = transaccion.execute(estado -> armarPedido(solicitud, ip, false));
 		return new Cotizacion(pedido.getCuponCodigo(), cuponService.tipoDe(pedido.getCuponId()), pedido.getSubtotal(),
-				pedido.getCostoEnvio(), pedido.getDescuento(), pedido.getTotal());
+				pedido.getCostoEnvio(), pedido.getEnvioDescripcion(), pedido.isEnvioAConvenir(), pedido.getDescuento(),
+				pedido.getTotal());
 	}
 
 	/** @param completo si es un pedido real (exige la dirección de envío) o solo una cotización */
@@ -109,7 +121,6 @@ public class CheckoutService {
 		pedido.setEstado(EstadoPedido.PENDIENTE);
 		pedido.setCliente(solicitud.getCliente());
 		pedido.setMoneda(tienda.moneda());
-		aplicarEntrega(solicitud, pedido, completo);
 
 		BigDecimal subtotal = BigDecimal.ZERO;
 		List<LineaCompra> lineas = new ArrayList<>();
@@ -122,6 +133,7 @@ public class CheckoutService {
 					item.getSubtotal()));
 		}
 		pedido.setSubtotal(subtotal);
+		aplicarEntrega(solicitud, pedido, completo);
 		aplicarCupon(solicitud, pedido, lineas, ip);
 		pedido.setTotal(subtotal.add(pedido.getCostoEnvio()).subtract(pedido.getDescuento()));
 		if (pedido.getTotal().signum() <= 0) {
@@ -143,17 +155,26 @@ public class CheckoutService {
 		pedido.setDescuento(aplicado.descuento());
 	}
 
+	/** Necesita el subtotal ya calculado: el envío puede ser gratis a partir de un monto. */
 	private void aplicarEntrega(Pedido solicitud, Pedido pedido, boolean completo) {
-		TiendaProperties.Envio envio = tienda.envio();
 		pedido.setEntrega(solicitud.getEntrega());
-		if (solicitud.getEntrega() == TipoEntrega.DOMICILIO) {
-			if (!envio.domicilioHabilitado()) {
-				throw new ReglaNegocioException("La tienda no realiza envíos a domicilio");
-			}
+		boolean domicilio = solicitud.getEntrega() == TipoEntrega.DOMICILIO;
+		if (domicilio) {
 			if (completo && solicitud.getDireccion() == null) {
 				throw new ReglaNegocioException("La dirección es obligatoria para envíos a domicilio");
 			}
 			pedido.setDireccion(solicitud.getDireccion());
+		}
+		if (envioService.habilitado()) {
+			aplicarEnvioPorZona(solicitud, pedido, domicilio);
+			return;
+		}
+
+		TiendaProperties.Envio envio = tienda.envio();
+		if (domicilio) {
+			if (!envio.domicilioHabilitado()) {
+				throw new ReglaNegocioException("La tienda no realiza envíos a domicilio");
+			}
 			pedido.setCostoEnvio(envio.costoFijo());
 		} else {
 			if (!envio.retiroHabilitado()) {
@@ -161,6 +182,20 @@ public class CheckoutService {
 			}
 			pedido.setCostoEnvio(BigDecimal.ZERO);
 		}
+	}
+
+	private void aplicarEnvioPorZona(Pedido solicitud, Pedido pedido, boolean domicilio) {
+		String codigoPostal = solicitud.getDireccion() == null ? null : solicitud.getDireccion().getCodigoPostal();
+		if (domicilio && !StringUtils.hasText(codigoPostal)) {
+			// Solo en una cotización: el cliente todavía no cargó el código postal
+			pedido.setCostoEnvio(BigDecimal.ZERO);
+			return;
+		}
+		OpcionEnvio opcion = envioService.elegir(domicilio, codigoPostal, solicitud.getEnvioOpcion(), pedido.getSubtotal());
+		pedido.setCostoEnvio(opcion.precio());
+		pedido.setEnvioOpcion(opcion.id());
+		pedido.setEnvioDescripcion(opcion.descripcion());
+		pedido.setEnvioAConvenir(opcion.costoAConvenir());
 	}
 
 	private static PedidoItem crearItem(Variante variante, Long varianteId, BigDecimal cantidad) {

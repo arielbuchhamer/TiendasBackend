@@ -129,6 +129,7 @@ public class ProductoService {
 		producto.setUnidadVenta(datos.getUnidadVenta());
 		producto.setActivo(datos.isActivo());
 		producto.setDestacado(datos.isDestacado());
+		producto.setMedidas(Medidas.copiar(datos.getMedidas()));
 		producto.getImagenes().clear();
 		producto.getImagenes().addAll(datos.getImagenes());
 	}

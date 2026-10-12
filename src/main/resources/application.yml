@@ -134,6 +134,9 @@ almacenamiento:
 descuentos:
   habilitada: ${DESCUENTOS_HABILITADA:false}
 
+envios:
+  habilitada: ${ENVIOS_HABILITADA:false}
+
 facturacion:
   habilitada: ${FACTURACION_HABILITADA:false}
   punto-venta: ${FACTURACION_PUNTO_VENTA:1}

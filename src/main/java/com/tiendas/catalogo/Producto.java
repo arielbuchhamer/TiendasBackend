@@ -11,6 +11,7 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -66,6 +67,11 @@ public class Producto extends EntidadBase {
 	private boolean activo = true;
 
 	private boolean destacado;
+
+	/** Peso y medidas del paquete; si no tiene, se usan los de su categoría. */
+	@Valid
+	@Embedded
+	private Medidas medidas;
 
 	/** Control de concurrencia optimista: el panel debe reenviar la versión que leyó. */
 	@Version

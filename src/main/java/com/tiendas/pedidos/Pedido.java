@@ -67,6 +67,22 @@ public class Pedido extends EntidadBase {
 	private BigDecimal costoEnvio;
 
 	/**
+	 * Opción de envío que eligió el cliente (ej. "ZONA-3"), con el módulo de envíos activo. Opcional: si
+	 * falta se usa la única disponible. El precio lo calcula el servidor.
+	 */
+	@Size(max = 40)
+	private String envioOpcion;
+
+	/** Cómo se entrega, tal como se le mostró al cliente (ej. "Envío a domicilio: Entre Ríos (2 a 4 días hábiles)"). */
+	@JsonProperty(access = Access.READ_ONLY)
+	private String envioDescripcion;
+
+	/** El costo del envío no se cobró en la web: se arregla con el cliente. */
+	@JsonProperty(access = Access.READ_ONLY)
+	@Column(name = "envio_a_convenir") // la estrategia de nombres no separa "AConvenir"
+	private boolean envioAConvenir;
+
+	/**
 	 * Código de descuento que escribió el cliente (opcional). Es lo único del cupón que llega en el request:
 	 * si es válido, el servidor lo guarda normalizado junto con el descuento calculado.
 	 */

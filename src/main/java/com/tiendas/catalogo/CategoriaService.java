@@ -70,5 +70,6 @@ public class CategoriaService {
 		categoria.setRubroId(datos.getRubroId());
 		categoria.setNombre(datos.getNombre().trim());
 		categoria.setOrden(datos.getOrden());
+		categoria.setMedidas(Medidas.copiar(datos.getMedidas()));
 	}
 }

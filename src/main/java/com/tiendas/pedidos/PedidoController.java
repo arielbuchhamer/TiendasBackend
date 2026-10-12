@@ -33,7 +33,8 @@ public class PedidoController {
 
 	/** Carrito y código para calcular el descuento antes de pagar. El email es opcional. */
 	public record SolicitudCotizacion(@NotBlank @Size(max = 60) String cuponCodigo, @Email @Size(max = 160) String email,
-			@NotNull TipoEntrega entrega, @Valid @NotEmpty @Size(max = 50) List<PedidoItem> items) {
+			@NotNull TipoEntrega entrega, @Size(max = 12) String codigoPostal, @Size(max = 40) String envioOpcion,
+			@Valid @NotEmpty @Size(max = 50) List<PedidoItem> items) {
 	}
 
 	private final CheckoutService checkoutService;
@@ -63,8 +64,8 @@ public class PedidoController {
 	@PostMapping("/checkout/cupon")
 	public CheckoutService.Cotizacion cotizarCupon(@Valid @RequestBody SolicitudCotizacion solicitud,
 			HttpServletRequest request) {
-		return checkoutService.cotizar(solicitud.cuponCodigo(), solicitud.email(), solicitud.entrega(), solicitud.items(),
-				ipCliente.de(request));
+		return checkoutService.cotizar(solicitud.cuponCodigo(), solicitud.email(), solicitud.entrega(),
+				solicitud.codigoPostal(), solicitud.envioOpcion(), solicitud.items(), ipCliente.de(request));
 	}
 
 	@GetMapping("/admin/pedidos")
