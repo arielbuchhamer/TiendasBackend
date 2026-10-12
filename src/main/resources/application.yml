@@ -167,3 +167,12 @@ facturacion:
   afrelay:
     url: ${FACTURACION_AFRELAY_URL:}
     token: ${FACTURACION_AFRELAY_TOKEN:}
+
+email:
+  habilitada: ${EMAIL_HABILITADA:false}
+  remitente: ${EMAIL_REMITENTE:}
+  admin: ${EMAIL_ADMIN:}
+  responder-a: ${EMAIL_RESPONDER_A:}
+  resend:
+    api-key: ${EMAIL_RESEND_API_KEY:}
+    url: ${EMAIL_RESEND_URL:https://api.resend.com}

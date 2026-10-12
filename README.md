@@ -26,6 +26,8 @@ Nació a partir de `BackTecnophones` (MongoDB), conservando su historial de Git 
   descuento de stock con bloqueo de filas (sin sobreventa) y revisión manual si se cobró sin stock o por otro monto.
 - **Panel de administración**: login por sesión, usuarios, catálogo, pedidos (con contador de no vistos).
 - **Facturación electrónica ARCA** (opcional, por tienda) vía AFRelay: Factura/Nota A, B, C, PDF con logo y color de marca.
+- **Emails** (opcional, por tienda) vía Resend: confirmación de compra al cliente y aviso de venta al administrador
+  cuando se aprueba el pago. Cola en la base con reintentos: si Resend falla, el email se reintenta y no se pierde.
 
 ## Stack
 
@@ -81,6 +83,8 @@ docker build -t tiendas-backend .    # imagen de producción (usuario sin privil
    - Primer deploy: `TIENDA_ADMIN_INICIAL_USUARIO` / `TIENDA_ADMIN_INICIAL_CLAVE` (borrarlas después).
    - Módulos opcionales: `FACTURACION_HABILITADA=true` + `FACTURACION_*` activa la facturación y muestra su
      tarjeta en el panel; sin definir (o `false`), la tienda no tiene facturación y el panel no la muestra.
+     `EMAIL_HABILITADA=true` + `EMAIL_*` activa los emails de pedidos (antes: verificar el dominio de la tienda
+     en Resend y crear una API key restringida a ese dominio).
 5. Dominio: usar un subdominio del dominio de la tienda para la API (ej. `api.mitienda.com.ar`). Front y API bajo
    el mismo dominio permiten cookies `SameSite=Lax` (funcionan en Safari) y que el front lea la cookie CSRF.
    Recomendado: Cloudflare delante de la API para cachear las imágenes en el borde. En Railway dejar
@@ -103,7 +107,7 @@ Listados paginados: `?page=0&size=24&sort=precio,asc` → `{ "content": [...], "
 
 | Público | |
 |---|---|
-| `GET /tienda` | Nombre, moneda, opciones de envío y módulos activos (`modulos.facturacion`) |
+| `GET /tienda` | Nombre, moneda, opciones de envío y módulos activos (`modulos.facturacion`, `modulos.email`) |
 | `GET /rubros`, `GET /categorias?rubroId=` | Clasificación del catálogo |
 | `GET /productos?rubroId=&categoriaId=&texto=&destacados=` | Listado paginado (solo activos) |
 | `GET /productos/{id}`, `GET /productos/aleatorios?cantidad=12` | Detalle / selección para la home |

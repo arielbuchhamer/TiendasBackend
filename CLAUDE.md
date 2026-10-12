@@ -61,6 +61,7 @@ Paquetes **por funcionalidad** (no por capa técnica), en `src/main/java/com/tie
 | `descuentos` | Cupones (códigos de descuento) y su cálculo en el checkout; módulo opcional (`descuentos.habilitada`) |
 | `envios` | Zonas de envío por código postal, retiro y envío gratis desde un monto; módulo opcional (`envios.habilitada`) |
 | `correo` | Correo Argentino (API MiCorreo): cotización, sucursales, alta de envíos y seguimiento; opcional (`correo-argentino.habilitada`) |
+| `emails` | Emails de pedidos vía Resend; cola `email_pendiente` (outbox) con reintentos; `email.habilitada=true` (`@EmailHabilitado`) |
 | `desarrollo` | Solo perfil `local`: `DatosEjemplo` (catálogo HA!Tablas) y `PasarelaSimulada` (pagos sin MP) |
 
 Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (reglas y transacciones) →
@@ -85,7 +86,10 @@ Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (re
 - **El stock vive solo en `Variante`** y todo producto tiene ≥ 1 variante. `CHECK (stock >= 0)` en la base.
 - **Montos** `NUMERIC(14,2)` / `BigDecimal`, cantidades `NUMERIC(14,3)`. Redondeo `HALF_UP` a 2 decimales.
 - **Precios y totales se calculan siempre en el servidor** (`CheckoutService`). Nunca usar importes del cliente.
-- **Llamadas HTTP externas fuera de transacciones** (Mercado Pago, AFRelay, S3): no retener conexiones de la base.
+- **Llamadas HTTP externas fuera de transacciones** (Mercado Pago, AFRelay, S3, Resend): no retener conexiones de la base.
+- **Emails por cola (outbox)**: nunca se envían dentro del flujo que los origina. Un listener de un evento de dominio
+  (ej. `PedidoAprobado`, publicado dentro de la transacción) guarda el email ya armado en `email_pendiente`, y
+  `EnvioEmails` lo envía después con reintentos. Para un email nuevo: publicar un evento y escucharlo en `emails`.
 - **Concurrencia**:
   - Pagos: `SELECT ... FOR UPDATE` sobre el pedido y sobre las variantes (ordenadas por id). Idempotente por
     `UNIQUE (proveedor, id_externo)` en `pago`.
@@ -129,9 +133,9 @@ En el `.env` local los acentos van escapados (`\u00e9`): Spring lee ese archivo 
 
 ### Módulos opcionales
 
-Una funcionalidad opcional (hoy: facturación, descuentos, envíos y Correo Argentino) se activa por instancia con una
-sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`, `CORREO_ARGENTINO_HABILITADA`).
-Esa misma propiedad:
+Una funcionalidad opcional (hoy: facturación, descuentos, envíos, Correo Argentino y emails) se activa por instancia
+con una sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`,
+`CORREO_ARGENTINO_HABILITADA`, `EMAIL_HABILITADA`). Esa misma propiedad:
 1. crea o no los beans y endpoints del módulo (anotación condicional, ej. `@FacturacionHabilitada`), y
 2. se informa al frontend en `GET /api/v1/tienda` → `modulos`, para que el panel muestre u oculte la sección.
 
