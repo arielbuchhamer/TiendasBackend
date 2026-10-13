@@ -89,7 +89,8 @@ class CorreoVentas {
 		}
 		// Un pedido en revisión (monto distinto o sin stock) no se confirma al cliente hasta que el vendedor lo resuelva
 		if (config.mailCliente() && !evento.requiereRevision()) {
-			String asunto = "¡Gracias por tu compra en " + tienda.nombre() + "! Pedido #" + numero;
+			// Asunto sobrio a propósito: los signos de exclamación suman puntos en los filtros de spam
+			String asunto = "Recibimos tu compra · Pedido #" + numero + " · " + tienda.nombre();
 			mandar(List.of(pedido.getCliente().getEmail()), null, asunto, "venta-cliente", datos, numero);
 		}
 	}
