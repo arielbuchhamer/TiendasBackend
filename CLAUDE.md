@@ -64,6 +64,7 @@ Paquetes **por funcionalidad** (no por capa técnica), en `src/main/java/com/tie
 | `descuentos` | Cupones (códigos de descuento) y su cálculo en el checkout; módulo opcional (`descuentos.habilitada`) |
 | `envios` | Zonas de envío por código postal, retiro y envío gratis desde un monto; módulo opcional (`envios.habilitada`) |
 | `notificaciones` | Mails de venta pagada al vendedor y al cliente (SMTP + Thymeleaf); módulo opcional (`notificaciones.habilitada`) |
+| `correo` | Correo Argentino (API MiCorreo): cotización, sucursales, alta de envíos y seguimiento; opcional (`correo-argentino.habilitada`) |
 | `desarrollo` | Solo perfil `local`: `DatosEjemplo` (catálogo HA!Tablas) y `PasarelaSimulada` (pagos sin MP) |
 
 Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (reglas y transacciones) →
@@ -131,8 +132,9 @@ en `application.yml` con `${VARIABLE}` + documentarlo en `.env.example`.
 
 ### Módulos opcionales
 
-Una funcionalidad opcional (hoy: facturación, descuentos, envíos y notificaciones) se activa por instancia con una
-sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`, `NOTIFICACIONES_HABILITADA`).
+Una funcionalidad opcional (hoy: facturación, descuentos, envíos, Correo Argentino y notificaciones) se activa por
+instancia con una sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`,
+`CORREO_ARGENTINO_HABILITADA`, `NOTIFICACIONES_HABILITADA`).
 Esa misma propiedad:
 1. crea o no los beans y endpoints del módulo (anotación condicional, ej. `@FacturacionHabilitada`), y
 2. se informa al frontend en `GET /api/v1/tienda` → `modulos`, para que el panel muestre u oculte la sección.
@@ -207,11 +209,34 @@ Paquete `envios`. Con el módulo apagado, el checkout usa el costo único de `ti
 - Nombres con "AConvenir": la estrategia de nombres de Hibernate no separa dos mayúsculas seguidas, por eso esos
   campos llevan `@Column(name = ...)` explícito.
 
-**Próxima etapa: Correo Argentino (MiCorreo API).** La idea es un tipo de zona "Correo Argentino" cuyo precio y plazo
-salen de `POST /rates` (CP origen/destino, peso y medidas), con opciones a domicilio y a sucursal (`/agencies`), y un
-botón en la venta que da de alta el envío (`/shipping/import`). El rótulo oficial lo genera MiCorreo después de
-pagar el envío; el PDF automático por API es de Paq.ar y requiere acuerdo comercial. Las zonas fijas siguen sirviendo
-para reparto propio, "a convenir" y como respaldo si el Correo no responde.
+### Correo Argentino (API MiCorreo)
+
+Paquete `correo`, requiere el módulo de envíos. Sigue el manual "API MiCorreo" (versión 2026-05): base
+`https://api.correoargentino.com.ar/micorreo/v1` (TEST: `apitest…`), credenciales de la API (una por ambiente, se
+piden al Correo) por HTTP Basic en `POST /token` → JWT, que `MiCorreoApi` reutiliza 50 minutos o hasta un 401.
+
+- **Interfaz `CorreoArgentino`** con dos implementaciones, elegidas en `CorreoArgentinoConfig`: `MiCorreoApi` (real)
+  y `MiCorreoSimulado` (precios, sucursales y seguimiento inventados). El simulado exige el perfil `local`: fuera de
+  local la app no arranca si se pide (mismo doble candado que los pagos simulados).
+- **Zonas** (`ZonaEnvio.tipo`): `PRECIO_FIJO` o `CORREO_ARGENTINO`, con `correoDomicilio`, `correoSucursal` y
+  `correoExpreso`. Una zona del Correo cotiza con `POST /rates/packages` (un bulto por línea del carrito; el Correo
+  apila) y devuelve opciones `CORREO-{zona}-{D|S}-{CP|EP}`. Si el Correo falla o a un producto le faltan peso o
+  medidas (`Medidas` del producto o de su categoría, las cuatro completas), se usa `precio` de la zona como
+  respaldo o el costo queda a convenir: nunca se corta la venta. Cotizaciones en caché 30 min, sucursales 12 h.
+- **Retiro en sucursal** (`TipoEntrega.SUCURSAL`): el cliente manda `envioSucursal` (código del Correo, ej. "E0101";
+  la primera letra es la provincia). `EnvioService#elegir` valida la sucursal con `GET /agencies` (activas y con
+  `pickupAvailability`) y cotiza con **el código postal de la sucursal**; el pedido guarda la sucursal y su detalle.
+- **Alta del envío** (`CorreoEnvios`, `POST /api/v1/admin/pedidos/{id}/correo`): `POST /shipping/import` con
+  `extOrderId` = código del pedido, un solo bulto consolidado (suma de pesos, largo y ancho máximos, alturas
+  apiladas), valor declarado = subtotal y la provincia traducida a su código de una letra (`Provincias`). Sin
+  `sender`: el Correo usa el domicilio de remitente del perfil de MiCorreo (sin domicilio cargado, rechaza). El
+  rótulo **no** sale por API: se paga y se imprime en MiCorreo ("Mis envíos"); el PDF automático es de Paq.ar y
+  requiere acuerdo comercial.
+- **Seguimiento**: el vendedor guarda el código del rótulo (`PUT …/seguimiento`) y `GET …/seguimiento` consulta
+  `/shipping/tracking` (un GET con el id en el cuerpo, como dice el manual: por eso `JdkClientHttpRequestFactory`).
+- Configuración: `CORREO_ARGENTINO_*` (URL, usuario y clave de la API, número de cliente de MiCorreo y código postal
+  de origen = el del domicilio de remitente). `GET /tienda` informa `modulos.correoArgentino`.
+- Pendiente: probar contra la API de TEST cuando el Correo entregue las credenciales.
 
 ### Notificaciones por mail
 
@@ -300,5 +325,5 @@ Con `merge.ff only`, un `git merge` que necesitaría commit de merge falla en lu
 - Estados de despacho del pedido (en preparación, enviado, entregado).
 - Limpieza de imágenes huérfanas en el almacenamiento.
 - Descuentos: probar con el sandbox de MP el ítem único que se manda cuando hay cupón (ver "Descuentos").
-- Envíos: integrar la cotización y el alta de envíos de Correo Argentino (ver "Envíos por zona").
+- Correo Argentino: probar contra la API de TEST (credenciales pedidas al Correo) y ajustar lo que difiera del manual.
 - Descuentos (etapa 2, si se pide): promociones automáticas sin código (ej. 2x1, descuento por cantidad).
