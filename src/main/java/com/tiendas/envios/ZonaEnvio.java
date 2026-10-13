@@ -6,6 +6,8 @@ import com.tiendas.comun.EntidadBase;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
@@ -29,10 +31,16 @@ public class ZonaEnvio extends EntidadBase {
 	@Size(max = 80)
 	private String nombre;
 
+	@Enumerated(EnumType.STRING)
+	private TipoZona tipo = TipoZona.PRECIO_FIJO;
+
 	@Size(max = 500)
 	private String codigosPostales;
 
-	/** Obligatorio salvo que el costo sea a convenir. */
+	/**
+	 * Obligatorio salvo que el costo sea a convenir. En las zonas de Correo Argentino es opcional: es el precio de
+	 * respaldo si el Correo no puede cotizar (sin precio, el costo queda a convenir).
+	 */
 	@PositiveOrZero
 	@Digits(integer = 12, fraction = 2)
 	private BigDecimal precio;
@@ -50,6 +58,13 @@ public class ZonaEnvio extends EntidadBase {
 	private Integer diasMax;
 
 	private boolean activa = true;
+
+	// Servicios que ofrece una zona de Correo Argentino
+	private boolean correoDomicilio = true;
+
+	private boolean correoSucursal = true;
+
+	private boolean correoExpreso;
 
 	/** Orden de evaluación y de aparición en el panel (menor primero). */
 	private int orden;

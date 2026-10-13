@@ -70,6 +70,7 @@ final class VistaPedido {
 		v.put("entrega", pedido.getEnvioDescripcion() != null ? pedido.getEnvioDescripcion()
 				: retiro ? "Retiro en el local" : "Envío a domicilio");
 		v.put("envioAConvenir", pedido.isEnvioAConvenir());
+		v.put("sucursal", pedido.getEnvioSucursalDetalle());
 		v.put("direccion", direccion(pedido.getDireccion()));
 		v.put("localidad", localidad(pedido.getDireccion()));
 

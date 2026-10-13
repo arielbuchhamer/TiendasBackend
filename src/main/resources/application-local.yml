@@ -19,6 +19,13 @@ descuentos:
 envios:
   habilitada: ${ENVIOS_HABILITADA:true}
 
+# Correo Argentino simulado: cotiza con precios inventados sin credenciales. Para probar con la API de TEST:
+# CORREO_ARGENTINO_SIMULADO=false + CORREO_ARGENTINO_URL de test + credenciales en .env
+correo-argentino:
+  habilitada: ${CORREO_ARGENTINO_HABILITADA:true}
+  simulado: ${CORREO_ARGENTINO_SIMULADO:true}
+  codigo-postal-origen: ${CORREO_ARGENTINO_CODIGO_POSTAL_ORIGEN:3177}
+
 # Los mails van a Mailpit (compose.yaml): no salen a internet y se ven en http://localhost:8025
 spring:
   mail:

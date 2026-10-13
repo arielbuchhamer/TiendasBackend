@@ -150,6 +150,15 @@ descuentos:
 envios:
   habilitada: ${ENVIOS_HABILITADA:false}
 
+correo-argentino:
+  habilitada: ${CORREO_ARGENTINO_HABILITADA:false}
+  url: ${CORREO_ARGENTINO_URL:https://api.correoargentino.com.ar/micorreo/v1}
+  usuario: ${CORREO_ARGENTINO_USUARIO:}
+  clave: ${CORREO_ARGENTINO_CLAVE:}
+  numero-cliente: ${CORREO_ARGENTINO_NUMERO_CLIENTE:}
+  codigo-postal-origen: ${CORREO_ARGENTINO_CODIGO_POSTAL_ORIGEN:}
+  simulado: ${CORREO_ARGENTINO_SIMULADO:false}
+
 notificaciones:
   habilitada: ${NOTIFICACIONES_HABILITADA:false}
   remitente: ${NOTIFICACIONES_REMITENTE:}

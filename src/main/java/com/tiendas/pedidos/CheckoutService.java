@@ -26,6 +26,7 @@ import com.tiendas.descuentos.CuponService.CuponAplicado;
 import com.tiendas.descuentos.CuponService.LineaCompra;
 import com.tiendas.descuentos.TipoCupon;
 import com.tiendas.envios.EnvioService;
+import com.tiendas.envios.EnvioService.EnvioElegido;
 import com.tiendas.envios.EnvioService.OpcionEnvio;
 
 /**
@@ -88,11 +89,12 @@ public class CheckoutService {
 	 * al confirmar la compra.
 	 */
 	public Cotizacion cotizar(String cuponCodigo, String email, TipoEntrega entrega, String codigoPostal,
-			String envioOpcion, List<PedidoItem> items, String ip) {
+			String envioOpcion, String envioSucursal, List<PedidoItem> items, String ip) {
 		Pedido solicitud = new Pedido();
 		solicitud.setCuponCodigo(cuponCodigo);
 		solicitud.setEntrega(entrega);
 		solicitud.setEnvioOpcion(envioOpcion);
+		solicitud.setEnvioSucursal(envioSucursal);
 		solicitud.setItems(items);
 		if (StringUtils.hasText(codigoPostal)) {
 			DireccionEnvio direccion = new DireccionEnvio();
@@ -133,7 +135,7 @@ public class CheckoutService {
 					item.getSubtotal()));
 		}
 		pedido.setSubtotal(subtotal);
-		aplicarEntrega(solicitud, pedido, completo);
+		aplicarEntrega(solicitud, pedido, completo, cantidades);
 		aplicarCupon(solicitud, pedido, lineas, ip);
 		pedido.setTotal(subtotal.add(pedido.getCostoEnvio()).subtract(pedido.getDescuento()));
 		if (pedido.getTotal().signum() <= 0) {
@@ -149,14 +151,14 @@ public class CheckoutService {
 		}
 		String email = solicitud.getCliente() == null ? null : solicitud.getCliente().getEmail();
 		CuponAplicado aplicado = cuponService.aplicar(solicitud.getCuponCodigo(), email, lineas,
-				pedido.getEntrega() == TipoEntrega.DOMICILIO, pedido.getCostoEnvio(), ip);
+				pedido.getEntrega() != TipoEntrega.RETIRO, pedido.getCostoEnvio(), ip);
 		pedido.setCuponId(aplicado.cupon().getId());
 		pedido.setCuponCodigo(aplicado.cupon().getCodigo());
 		pedido.setDescuento(aplicado.descuento());
 	}
 
 	/** Necesita el subtotal ya calculado: el envío puede ser gratis a partir de un monto. */
-	private void aplicarEntrega(Pedido solicitud, Pedido pedido, boolean completo) {
+	private void aplicarEntrega(Pedido solicitud, Pedido pedido, boolean completo, Map<Long, BigDecimal> cantidades) {
 		pedido.setEntrega(solicitud.getEntrega());
 		boolean domicilio = solicitud.getEntrega() == TipoEntrega.DOMICILIO;
 		if (domicilio) {
@@ -166,8 +168,11 @@ public class CheckoutService {
 			pedido.setDireccion(solicitud.getDireccion());
 		}
 		if (envioService.habilitado()) {
-			aplicarEnvioPorZona(solicitud, pedido, domicilio);
+			aplicarEnvioPorZona(solicitud, pedido, cantidades, completo);
 			return;
+		}
+		if (solicitud.getEntrega() == TipoEntrega.SUCURSAL) {
+			throw new ReglaNegocioException("La tienda no hace envíos a sucursales del Correo");
 		}
 
 		TiendaProperties.Envio envio = tienda.envio();
@@ -184,18 +189,29 @@ public class CheckoutService {
 		}
 	}
 
-	private void aplicarEnvioPorZona(Pedido solicitud, Pedido pedido, boolean domicilio) {
+	private void aplicarEnvioPorZona(Pedido solicitud, Pedido pedido, Map<Long, BigDecimal> cantidades, boolean completo) {
 		String codigoPostal = solicitud.getDireccion() == null ? null : solicitud.getDireccion().getCodigoPostal();
-		if (domicilio && !StringUtils.hasText(codigoPostal)) {
-			// Solo en una cotización: el cliente todavía no cargó el código postal
+		boolean faltaDestino = switch (solicitud.getEntrega()) {
+			case DOMICILIO -> !StringUtils.hasText(codigoPostal);
+			case SUCURSAL -> !StringUtils.hasText(solicitud.getEnvioSucursal());
+			case RETIRO -> false;
+		};
+		if (faltaDestino && !completo) {
+			// Solo en una cotización: el cliente todavía no cargó el código postal o la sucursal
 			pedido.setCostoEnvio(BigDecimal.ZERO);
 			return;
 		}
-		OpcionEnvio opcion = envioService.elegir(domicilio, codigoPostal, solicitud.getEnvioOpcion(), pedido.getSubtotal());
+		EnvioElegido elegido = envioService.elegir(EnvioService.Modalidad.valueOf(solicitud.getEntrega().name()),
+				codigoPostal, solicitud.getEnvioOpcion(), solicitud.getEnvioSucursal(), pedido.getSubtotal(), cantidades);
+		OpcionEnvio opcion = elegido.opcion();
 		pedido.setCostoEnvio(opcion.precio());
 		pedido.setEnvioOpcion(opcion.id());
 		pedido.setEnvioDescripcion(opcion.descripcion());
 		pedido.setEnvioAConvenir(opcion.costoAConvenir());
+		if (elegido.sucursal() != null) {
+			pedido.setEnvioSucursal(elegido.sucursal().codigo());
+			pedido.setEnvioSucursalDetalle(elegido.sucursal().detalle());
+		}
 	}
 
 	private static PedidoItem crearItem(Variante variante, Long varianteId, BigDecimal cantidad) {

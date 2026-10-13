@@ -139,6 +139,9 @@ class CorreoVentas {
 		if (d.get("direccion") != null) {
 			texto.append("\n").append(d.get("direccion")).append(", ").append(d.get("localidad"));
 		}
+		if (d.get("sucursal") != null) {
+			texto.append("\nSucursal: ").append(d.get("sucursal"));
+		}
 		texto.append("\n\n").append(d.get("proximosPasos")).append("\n");
 		return texto.toString();
 	}

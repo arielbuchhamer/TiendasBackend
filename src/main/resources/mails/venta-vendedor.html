@@ -92,6 +92,9 @@
                             <span th:text="${direccion}">Dirección</span><br>
                             <span th:text="${localidad}">Localidad</span>
                           </p>
+                          <p th:if="${sucursal}" style="margin:4px 0 0;font-size:14px;line-height:20px;color:#57534e;">
+                            Sucursal del Correo: <span th:text="${sucursal}">sucursal</span>
+                          </p>
                           <p th:if="${envioAConvenir}" style="margin:10px 0 0;padding:8px 12px;border-radius:8px;background:#fdf1e2;font-size:13.5px;color:#9a3412;">
                             El envío no se cobró en la web: acordá el costo con el cliente.
                           </p>

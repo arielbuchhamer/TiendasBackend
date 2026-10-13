@@ -77,6 +77,22 @@ public class Pedido extends EntidadBase {
 	@JsonProperty(access = Access.READ_ONLY)
 	private String envioDescripcion;
 
+	/** Sucursal de Correo Argentino donde retira el cliente (solo entrega SUCURSAL), ej. "E0101". */
+	@Size(max = 10)
+	private String envioSucursal;
+
+	/** Nombre y dirección de la sucursal al momento de la compra. */
+	@JsonProperty(access = Access.READ_ONLY)
+	private String envioSucursalDetalle;
+
+	/** Cuándo se dio de alta el envío en MiCorreo (null = todavía no). */
+	@JsonProperty(access = Access.READ_ONLY)
+	private Instant correoImportadoEn;
+
+	/** Código de seguimiento del paquete (lo carga el vendedor después de despachar). */
+	@JsonProperty(access = Access.READ_ONLY)
+	private String envioSeguimiento;
+
 	/** El costo del envío no se cobró en la web: se arregla con el cliente. */
 	@JsonProperty(access = Access.READ_ONLY)
 	@Column(name = "envio_a_convenir") // la estrategia de nombres no separa "AConvenir"
