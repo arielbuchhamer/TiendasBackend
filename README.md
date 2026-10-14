@@ -140,7 +140,10 @@ Listados paginados: `?page=0&size=24&sort=precio,asc` → `{ "content": [...], "
 
 ## Versionado y ramas
 
-- `main`: estable, lo que se despliega. `develop`: integración. `feature/*`: desarrollo. Las ramas **no** representan clientes.
+- `main`: estable, lo que se despliega. `develop`: integración. Ramas de trabajo personales o `feature/*`. Las
+  ramas **no** representan clientes.
+- Historial lineal: los commits se integran a `develop` con **cherry-pick** (nunca merge) y las ramas de trabajo se
+  actualizan con **rebase** sobre `develop`. Paso a paso en [CLAUDE.md](CLAUDE.md#git-y-versionado).
 - Versiones con tags semánticos (`v1.0.0`, `v1.1.0`, …). Cada tienda en Railway apunta al tag que corresponda y se
   actualiza de forma controlada.
 - Los cambios de esquema son migraciones Flyway nuevas (`V2__...sql`) que se aplican solas al desplegar; nunca se

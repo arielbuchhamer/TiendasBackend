@@ -263,48 +263,73 @@ repositorio. Para conectar uno: `VITE_API_URL=<api>/api/v1` y axios con `withCre
 
 ## Git y versionado
 
-- Ramas: `main` (estable), `develop` (integración), `feature/*`. Las ramas no son clientes.
+- Ramas: `main` (estable), `develop` (integración compartida) y ramas de trabajo: personales (ej. `juan`) o por
+  funcionalidad (`feature/*`), según convenga. Las ramas no son clientes.
 - Releases con tags semánticos `vX.Y.Z` desde `main`. Cada tienda despliega un tag.
-- Commits en español, descriptivos, en imperativo ("Agrega…", "Corrige…").
+- Commits en español, descriptivos, en imperativo ("Agrega…", "Corrige…"). Un commit = un cambio lógico: así se
+  pueden integrar por separado con cherry-pick.
 
-### Historial lineal: nunca commits de merge
+### Integración: historial lineal, sin commits de merge
 
-El historial de `main` y `develop` es una línea recta. **No se hacen merges que generen commit de merge**;
-se integra con rebase, avance rápido (`--ff-only`) o cherry-pick. La única excepción es el commit inicial que
-unió el historial importado de BackTecnophones.
+El historial de `main` y `develop` es una línea recta. **Nunca `git merge` hacia `develop`** (ni commits "Merge
+branch…"): se integra con rebase y cherry-pick. La única excepción es el commit inicial que unió el historial
+importado de BackTecnophones. **`develop` nunca se reescribe ni se fuerza el push.**
+
+1. **Trabajar en la rama propia** y commitear ahí.
+2. **Actualizar la rama propia con rebase** sobre `develop`, nunca con merge:
+   ```bash
+   git fetch origin
+   git rebase origin/develop
+   ```
+   Si hay conflictos: resolverlos, `git add` y `git rebase --continue`. Los commits que ya estaban integrados en
+   `develop` por cherry-pick git los descarta solo durante el rebase. Después, la rama propia se sube con
+   `git push --force-with-lease` (solo la rama propia, nunca `develop` ni `main`).
+3. **Integrar a `develop` con cherry-pick** de los commits que estén listos:
+   ```bash
+   git switch develop
+   git pull --ff-only origin develop
+   git cherry-pick <sha1> <sha2> ...      # en orden cronológico; o un rango: <primero>^..<último>
+   ./mvnw compile                          # verificar que no se rompió nada (y levantar la app si hace falta)
+   git push origin develop                 # push normal, sin --force
+   git switch <rama-propia>
+   ```
+   Qué commits de la rama propia todavía no están en `develop`:
+   `git log --oneline --cherry-pick --right-only origin/develop...HEAD`.
+   Si el push de `develop` es rechazado porque el otro integró antes: `git pull --rebase origin develop` (solo
+   rebasea los commits locales todavía no pusheados) y volver a pushear. Nunca `--force`.
+4. Después de integrar, volver a la rama propia y `git rebase origin/develop` para que quede alineada.
+
+**Migraciones de Flyway al integrar:** si dos ramas agregaron una migración con el mismo número, la que se integra
+segunda se renumera (ej. `V2__…` → `V6__…`) **antes** del cherry-pick a `develop`. Una vez en `develop`, una
+migración no se toca más.
+
+### Versiones y hotfix
 
 ```bash
-# 1. Nueva funcionalidad
-git checkout develop && git pull
-git checkout -b feature/mi-cambio
-# ...commits...
-
-# 2. Integrar a develop: primero rebase sobre develop actualizado, después avance rápido
-git fetch origin
-git rebase origin/develop                # resolver conflictos acá, en la feature
-git checkout develop && git pull
-git merge --ff-only feature/mi-cambio    # solo mueve el puntero; si no es posible, falla (rebasear de nuevo)
-git push origin develop
-git branch -d feature/mi-cambio
-
-# 3. Publicar una versión: main avanza hasta develop
-git checkout main && git pull
-git merge --ff-only develop
+# Publicar una versión: main avanza hasta develop
+git switch main && git pull --ff-only
+git merge --ff-only develop               # solo mueve el puntero; si no es posible, falla
 git tag v1.2.0 && git push origin main v1.2.0
 
-# 4. Hotfix urgente sobre main: se corrige en main y se lleva a develop con cherry-pick
-git checkout main && git checkout -b hotfix/descripcion
+# Hotfix urgente: se corrige sobre main y se lleva a develop con cherry-pick
+git switch main && git switch -c hotfix/descripcion
 # ...commit...
-git checkout main && git merge --ff-only hotfix/descripcion && git push origin main
-git checkout develop && git cherry-pick <sha-del-hotfix> && git push origin develop
+git switch main && git merge --ff-only hotfix/descripcion && git push origin main
+git switch develop && git cherry-pick <sha-del-hotfix> && git push origin develop
 ```
 
-Configuración local recomendada (ya aplicada en este clon):
-`git config pull.rebase true`, `git config merge.ff only`, `git config rebase.autoStash true`.
-Con `merge.ff only`, un `git merge` que necesitaría commit de merge falla en lugar de crearlo.
+Configuración local recomendada: `git config pull.rebase true`, `git config merge.ff only`,
+`git config rebase.autoStash true`. Con `merge.ff only`, un `git merge` que necesitaría commit de merge falla en
+lugar de crearlo. En GitHub: proteger `main` y `develop` con "Require linear history".
 
-- No reescribir historia ya publicada de `main`. En `develop` solo con `git push --force-with-lease` y avisando.
-- En GitHub: proteger `main` y `develop` con "Require linear history" y permitir solo "Rebase and merge" en los PR.
+### Reglas para Claude Code
+
+- No commitear, pushear, hacer rebase ni cherry-pick sin que el usuario lo pida.
+- Prohibido `git push --force` / `--force-with-lease` sobre `develop` o `main`, y prohibido `git merge` hacia
+  `develop` (usar cherry-pick).
+- No reescribir ni pushear la rama del compañero.
+- Si un cherry-pick o rebase tiene conflictos, mostrarlos y resolverlos con el usuario; no descartar cambios del
+  otro con `--theirs`/`--ours` sin confirmar.
 
 ## Pendientes conocidos
 
