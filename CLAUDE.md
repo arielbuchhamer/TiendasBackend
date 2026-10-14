@@ -327,6 +327,64 @@ repositorio. Para conectar uno: `VITE_API_URL=<api>/api/v1` y axios con `withCre
 - Comentarios para explicar el **por qué** (decisiones, riesgos), no el qué.
 - Nada específico de un cliente en el código (nombres, dominios, CUIT, logos, categorías de MP).
 
+## Código nuevo: mantenibilidad, reutilización y performance
+
+Reglas para todo lo que se escriba de ahora en adelante (funcionalidades nuevas y las partes que se modifiquen).
+El código existente **no se refactoriza solo por esto** (decisión del dueño, 2026-10): se mejora cuando se lo toca.
+
+### Reutilización
+- Antes de escribir una utilidad, buscar si ya existe algo igual en el proyecto. **Si un patrón aparece por
+  segunda vez, se extrae en lugar de copiarse.**
+- Dónde va lo extraído: si es del dominio, como método de la entidad, enum o embebido (ej. "¿la cantidad admite
+  decimales?" en `UnidadVenta`, "¿medidas completas?" en `Medidas`); si es transversal, una clase chica en `comun`
+  (ej. redondeo de montos, texto opcional `trim`/`null`, códigos en mayúsculas). No crear clases `Utils` genéricas
+  ni capas nuevas (ver "Arquitectura").
+- Anotaciones repetidas con los mismos parámetros se agrupan en una meta-anotación (como `@FacturacionHabilitada`).
+- Un módulo nuevo copia la forma de los existentes: record `*Properties`, anotación condicional, `Controller` →
+  `Service` → `Repository`, campo en `TiendaController.Modulos`.
+- Una integración externa nueva va detrás de una interfaz con implementación real y simulada (como `PasarelaPago`
+  y `CorreoArgentino`), con el doble candado del perfil `local` para la simulada.
+
+### Buenas prácticas de Java
+- Menor visibilidad posible: package-private por defecto (controllers, limitadores, clientes HTTP internos);
+  `public` solo lo que usa otro paquete.
+- Campos inyectados `final`; datos inmutables como `record`; devolver colecciones inmodificables (`List.of`,
+  `Stream#toList`) y nunca `null` en lugar de una colección vacía. `Optional` solo como tipo de retorno.
+- Métodos cortos y con un solo propósito. Si un service supera ~300 líneas o mezcla responsabilidades (ej.
+  cálculo para el checkout y ABM del panel), se divide en dos clases del mismo paquete.
+- `enum` o constantes `static final` en lugar de strings y números mágicos.
+- Excepciones del proyecto (ver "Convenciones"); en services nunca `ResponseStatusException`. No tragar
+  excepciones: o se relanzan con causa o se loguean con el motivo.
+- Objetos caros o reutilizables como constantes o campos: `Pattern` compilado, `RestClient`, formateadores
+  thread-safe (`DateTimeFormatter`). `DecimalFormat` no es thread-safe: crearlo por llamada o no compartirlo.
+- Java 21 moderno: `switch` como expresión, pattern matching, records, `getFirst()`, text blocks.
+- Logs con `{}` (nunca concatenando), nivel acorde (`warn` = algo a revisar, `error` = falla real) y sin secretos
+  ni datos personales completos.
+
+### Performance (siempre)
+- **Sin N+1**: nada de llamadas al repositorio dentro de un loop. Cargar en lote (`findAllById`, `IN :ids`,
+  `JOIN FETCH`, `default_batch_fetch_size`).
+- **No consultar dos veces lo mismo en un flujo**: si ya se cargaron las variantes o los ajustes, se pasan como
+  parámetro en lugar de volver a buscarlos.
+- Filtrar, contar y sumar en la base (`WHERE`, `COUNT`, `SUM`, `EXISTS`), no trayendo filas para filtrar en memoria.
+- Todo listado que pueda crecer, paginado.
+- Transacciones `readOnly` por defecto, cortas y sin llamadas HTTP adentro.
+- Lecturas públicas frecuentes, en la caché `catalogo` (con `@CacheEvict` en cada escritura que las afecte).
+- Consulta nueva → `EXPLAIN ANALYZE` e índice en una migración si hace falta. Llamadas externas con timeouts
+  explícitos de conexión y lectura.
+- Para verificar, en local mirar las queries que genera un endpoint (`logging.level.org.hibernate.SQL=debug`) y
+  confirmar que no hay consultas repetidas.
+
+### Deuda conocida (corregir cuando se toque esa parte)
+- `CuponService#aplicar` lanza `ResponseStatusException` (429): pasar a una excepción del proyecto manejada en
+  `ManejadorErrores` (lo mismo `AuthController` con 401/429, si se generaliza).
+- `CuponService#obtener` trae las métricas de todos los cupones para usar una: consulta por id.
+- Checkout y cotización consultan las variantes dos veces (`CheckoutService` y `EnvioService#paquetes`) y
+  `EnvioService` lee los ajustes varias veces por request.
+- "¿Tiene decimales?" repetido en `ProductoService`, `CheckoutService` y `MercadoPagoPasarela`; `completas(Medidas)`
+  vive en `EnvioService`; redondeo `setScale(2, HALF_UP)` y "texto opcional" repetidos en varios services.
+- Eliminar con `flush` + `ConflictoException` repetido en `RubroService`, `CategoriaService` y `ProductoService`.
+
 ## Git y versionado
 
 - Ramas: `main` (estable), `develop` (integración compartida) y ramas de trabajo: personales (ej. `juan`) o por
