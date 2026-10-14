@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -27,6 +29,7 @@ import com.tiendas.catalogo.VarianteRepository;
 import com.tiendas.comun.NoEncontradoException;
 import com.tiendas.comun.ReglaNegocioException;
 import com.tiendas.correo.CorreoArgentino;
+import com.tiendas.correo.Provincias;
 
 /**
  * Opciones de entrega para un código postal: retiro en el local y envío según la zona. Una zona tiene precio fijo
@@ -73,7 +76,7 @@ public class EnvioService {
 	public record EnvioElegido(OpcionEnvio opcion, CorreoArgentino.Sucursal sucursal) {
 	}
 
-	public record Cotizacion(String codigoPostal, BigDecimal subtotal, BigDecimal envioGratisDesde,
+	public record Cotizacion(String codigoPostal, String provincia, BigDecimal subtotal, BigDecimal envioGratisDesde,
 			List<OpcionEnvio> opciones) {
 	}
 
@@ -112,28 +115,34 @@ public class EnvioService {
 				!zonaRepository.findByActivaTrueOrderByOrdenAscIdAsc().isEmpty(), ajustes.getEnvioGratisDesde());
 	}
 
-	/** Opciones para un carrito (variante → cantidad). Sin código postal, solo el retiro. */
-	public Cotizacion cotizar(String codigoPostal, Map<Long, BigDecimal> cantidades) {
+	/** Opciones para un carrito (variante → cantidad). Sin código postal ni provincia, solo el retiro. */
+	public Cotizacion cotizar(String codigoPostal, String provincia, Map<Long, BigDecimal> cantidades) {
 		BigDecimal subtotal = varianteRepository.buscarConProducto(cantidades.keySet()).stream()
 				.filter(v -> v.isActivo() && v.getProducto().isActivo())
 				.map(v -> precioDe(v, cantidades.get(v.getId())))
 				.reduce(BigDecimal.ZERO, BigDecimal::add);
-		return new Cotizacion(StringUtils.hasText(codigoPostal) ? normalizar(codigoPostal) : null, subtotal,
-				ajustes().getEnvioGratisDesde(), opciones(codigoPostal, cantidades, subtotal));
+		return new Cotizacion(StringUtils.hasText(codigoPostal) ? normalizar(codigoPostal) : null,
+				Provincias.codigo(provincia), subtotal, ajustes().getEnvioGratisDesde(),
+				opciones(codigoPostal, provincia, cantidades, subtotal));
 	}
 
-	public List<OpcionEnvio> opciones(String codigoPostal, Map<Long, BigDecimal> cantidades, BigDecimal subtotal) {
+	/** @param provincia nombre o código de una letra; elige la zona cuando el código postal no coincide con ninguna */
+	public List<OpcionEnvio> opciones(String codigoPostal, String provincia, Map<Long, BigDecimal> cantidades,
+			BigDecimal subtotal) {
 		AjustesEnvio ajustes = ajustes();
 		List<OpcionEnvio> opciones = new ArrayList<>();
 		if (ajustes.isRetiroHabilitado()) {
 			opciones.add(new OpcionEnvio(RETIRO, Modalidad.RETIRO, true, "Retiro en el local", "Retiro en el local",
 					BigDecimal.ZERO, false, false, null, null, ajustes.getRetiroDetalle()));
 		}
-		if (StringUtils.hasText(codigoPostal)) {
-			String cp = normalizar(codigoPostal);
-			zonaPara(cp).ifPresent(zona -> opciones.addAll(zona.getTipo() == TipoZona.CORREO_ARGENTINO
-					? opcionesCorreo(zona, cp, cantidades, subtotal, ajustes)
-					: List.of(opcionDe(zona, subtotal, ajustes))));
+		String cp = StringUtils.hasText(codigoPostal) ? normalizar(codigoPostal) : null;
+		String codigoProvincia = Provincias.codigo(provincia);
+		if (cp != null || codigoProvincia != null) {
+			zonaPara(cp, codigoProvincia).ifPresent(zona -> opciones.addAll(zona.getTipo() != TipoZona.CORREO_ARGENTINO
+					? List.of(opcionDe(zona, subtotal, ajustes))
+					// El Correo cotiza por código postal: sin él, el precio de respaldo de la zona
+					: cp == null ? List.of(respaldo(zona, subtotal, ajustes))
+					: opcionesCorreo(zona, cp, cantidades, subtotal, ajustes)));
 		}
 		return opciones;
 	}
@@ -145,35 +154,37 @@ public class EnvioService {
 	 * @param sucursalCodigo sucursal del Correo donde retira (solo modalidad SUCURSAL); su código postal define
 	 *                       el precio
 	 */
-	public EnvioElegido elegir(Modalidad modalidad, String codigoPostal, String opcionId, String sucursalCodigo,
-			BigDecimal subtotal, Map<Long, BigDecimal> cantidades) {
+	public EnvioElegido elegir(Modalidad modalidad, String codigoPostal, String provincia, String opcionId,
+			String sucursalCodigo, BigDecimal subtotal, Map<Long, BigDecimal> cantidades) {
 		if (modalidad == Modalidad.RETIRO) {
 			if (!ajustes().isRetiroHabilitado()) {
 				throw new ReglaNegocioException("La tienda no permite retirar los pedidos");
 			}
-			return new EnvioElegido(opciones(null, cantidades, subtotal).getFirst(), null);
+			return new EnvioElegido(opciones(null, null, cantidades, subtotal).getFirst(), null);
 		}
 
 		CorreoArgentino.Sucursal sucursal = null;
 		String cp = StringUtils.hasText(codigoPostal) ? normalizar(codigoPostal) : null;
+		String codigoProvincia = Provincias.codigo(provincia);
 		if (modalidad == Modalidad.SUCURSAL) {
 			sucursal = sucursal(sucursalCodigo);
+			codigoProvincia = sucursal.codigo().substring(0, 1);
 			if (sucursal.codigoPostal() != null) {
 				cp = normalizar(sucursal.codigoPostal());
 			}
 		}
-		if (cp == null) {
+		if (cp == null && codigoProvincia == null) {
 			throw new ReglaNegocioException("Falta el código postal para calcular el envío");
 		}
-		String destino = cp;
-		OpcionEnvio opcion = opciones(cp, cantidades, subtotal).stream()
+		String destino = cp != null ? "el código postal " + cp : Provincias.nombre(codigoProvincia);
+		OpcionEnvio opcion = opciones(cp, codigoProvincia, cantidades, subtotal).stream()
 				.filter(o -> o.modalidad() == modalidad)
 				.filter(o -> opcionId == null || o.id().equals(opcionId))
 				.findFirst()
 				.orElseThrow(() -> new ReglaNegocioException(opcionId == null
 						? "No hay envíos " + (modalidad == Modalidad.SUCURSAL ? "a sucursal" : "a domicilio")
-								+ " para el código postal " + destino + ". Consultanos por WhatsApp."
-						: "La opción de envío elegida ya no está disponible para el código postal " + destino));
+								+ " para " + destino + ". Consultanos por WhatsApp."
+						: "La opción de envío elegida ya no está disponible para " + destino));
 		return new EnvioElegido(opcion, sucursal);
 	}
 
@@ -270,15 +281,24 @@ public class EnvioService {
 				zona.getDiasMax(), null);
 	}
 
-	private Optional<ZonaEnvio> zonaPara(String cp) {
-		int codigo = Integer.parseInt(cp);
+	/**
+	 * Primero las zonas por código postal (lo local), después las zonas por provincia y al final la zona sin
+	 * códigos ni provincias ("resto del país"). Dentro de cada grupo, por orden.
+	 */
+	private Optional<ZonaEnvio> zonaPara(String cp, String codigoProvincia) {
 		List<ZonaEnvio> activas = zonaRepository.findByActivaTrueOrderByOrdenAscIdAsc();
-		// Primero las zonas con códigos postales; la zona sin códigos ("resto del país") va al final
-		return activas.stream()
+		Optional<ZonaEnvio> porCodigo = cp == null ? Optional.empty() : activas.stream()
 				.filter(z -> StringUtils.hasText(z.getCodigosPostales()))
-				.filter(z -> incluye(z.getCodigosPostales(), codigo))
-				.findFirst()
-				.or(() -> activas.stream().filter(z -> !StringUtils.hasText(z.getCodigosPostales())).findFirst());
+				.filter(z -> incluye(z.getCodigosPostales(), Integer.parseInt(cp)))
+				.findFirst();
+		return porCodigo
+				.or(() -> codigoProvincia == null ? Optional.empty() : activas.stream()
+						.filter(z -> !StringUtils.hasText(z.getCodigosPostales()) && StringUtils.hasText(z.getProvincias()))
+						.filter(z -> List.of(z.getProvincias().split(",")).contains(codigoProvincia))
+						.findFirst())
+				.or(() -> activas.stream()
+						.filter(z -> !StringUtils.hasText(z.getCodigosPostales()) && !StringUtils.hasText(z.getProvincias()))
+						.findFirst());
 	}
 
 	private static OpcionEnvio opcionDe(ZonaEnvio zona, BigDecimal subtotal, AjustesEnvio ajustes) {
@@ -348,6 +368,7 @@ public class EnvioService {
 	private void copiar(ZonaEnvio datos, ZonaEnvio zona) {
 		zona.setNombre(datos.getNombre().trim());
 		zona.setCodigosPostales(normalizarLista(datos.getCodigosPostales()));
+		zona.setProvincias(normalizarProvincias(datos.getProvincias()));
 		zona.setTipo(datos.getTipo() == null ? TipoZona.PRECIO_FIJO : datos.getTipo());
 		if (zona.getTipo() == TipoZona.CORREO_ARGENTINO) {
 			if (correo.getIfAvailable() == null) {
@@ -414,6 +435,25 @@ public class EnvioService {
 			tramos.add(m.group(2) == null ? m.group(1) : m.group(1) + "-" + m.group(2));
 		}
 		return tramos.isEmpty() ? null : String.join(", ", tramos);
+	}
+
+	/** "Entre Ríos, s ,X" → "E,S,X" (códigos de una letra, sin repetir, en orden). Vacía = sin provincias. */
+	static String normalizarProvincias(String lista) {
+		if (!StringUtils.hasText(lista)) {
+			return null;
+		}
+		Set<String> codigos = new TreeSet<>();
+		for (String parte : lista.split(",")) {
+			if (!StringUtils.hasText(parte)) {
+				continue;
+			}
+			String codigo = Provincias.codigo(parte);
+			if (codigo == null) {
+				throw new ReglaNegocioException("Provincia desconocida: \"" + parte.trim() + "\"");
+			}
+			codigos.add(codigo);
+		}
+		return codigos.isEmpty() ? null : String.join(",", codigos);
 	}
 
 	static boolean incluye(String lista, int codigo) {

@@ -38,6 +38,14 @@ public class ZonaEnvio extends EntidadBase {
 	private String codigosPostales;
 
 	/**
+	 * Provincias de la zona, con el código de una letra del Correo separado por comas (ej. "E,S,X"). Una zona con
+	 * códigos postales se elige por código postal; si no tiene, por provincia; sin ninguno de los dos es "el resto
+	 * del país".
+	 */
+	@Size(max = 100)
+	private String provincias;
+
+	/**
 	 * Obligatorio salvo que el costo sea a convenir. En las zonas de Correo Argentino es opcional: es el precio de
 	 * respaldo si el Correo no puede cotizar (sin precio, el costo queda a convenir).
 	 */

@@ -89,16 +89,17 @@ public class CheckoutService {
 	 * al confirmar la compra.
 	 */
 	public Cotizacion cotizar(String cuponCodigo, String email, TipoEntrega entrega, String codigoPostal,
-			String envioOpcion, String envioSucursal, List<PedidoItem> items, String ip) {
+			String provincia, String envioOpcion, String envioSucursal, List<PedidoItem> items, String ip) {
 		Pedido solicitud = new Pedido();
 		solicitud.setCuponCodigo(cuponCodigo);
 		solicitud.setEntrega(entrega);
 		solicitud.setEnvioOpcion(envioOpcion);
 		solicitud.setEnvioSucursal(envioSucursal);
 		solicitud.setItems(items);
-		if (StringUtils.hasText(codigoPostal)) {
+		if (StringUtils.hasText(codigoPostal) || StringUtils.hasText(provincia)) {
 			DireccionEnvio direccion = new DireccionEnvio();
 			direccion.setCodigoPostal(codigoPostal);
+			direccion.setProvincia(provincia);
 			solicitud.setDireccion(direccion);
 		}
 		if (StringUtils.hasText(email)) {
@@ -191,8 +192,9 @@ public class CheckoutService {
 
 	private void aplicarEnvioPorZona(Pedido solicitud, Pedido pedido, Map<Long, BigDecimal> cantidades, boolean completo) {
 		String codigoPostal = solicitud.getDireccion() == null ? null : solicitud.getDireccion().getCodigoPostal();
+		String provincia = solicitud.getDireccion() == null ? null : solicitud.getDireccion().getProvincia();
 		boolean faltaDestino = switch (solicitud.getEntrega()) {
-			case DOMICILIO -> !StringUtils.hasText(codigoPostal);
+			case DOMICILIO -> !StringUtils.hasText(codigoPostal) && !StringUtils.hasText(provincia);
 			case SUCURSAL -> !StringUtils.hasText(solicitud.getEnvioSucursal());
 			case RETIRO -> false;
 		};
@@ -202,7 +204,8 @@ public class CheckoutService {
 			return;
 		}
 		EnvioElegido elegido = envioService.elegir(EnvioService.Modalidad.valueOf(solicitud.getEntrega().name()),
-				codigoPostal, solicitud.getEnvioOpcion(), solicitud.getEnvioSucursal(), pedido.getSubtotal(), cantidades);
+				codigoPostal, provincia, solicitud.getEnvioOpcion(), solicitud.getEnvioSucursal(), pedido.getSubtotal(),
+				cantidades);
 		OpcionEnvio opcion = elegido.opcion();
 		pedido.setCostoEnvio(opcion.precio());
 		pedido.setEnvioOpcion(opcion.id());
