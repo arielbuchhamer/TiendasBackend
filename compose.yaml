@@ -12,12 +12,5 @@ services:
     volumes:
       - postgres-datos:/var/lib/postgresql
 
-  # Buzón de prueba: atrapa los mails que manda la app (SMTP en :1025) y los muestra en http://localhost:8025
-  mailpit:
-    image: axllent/mailpit:v1.27
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-
 volumes:
   postgres-datos:

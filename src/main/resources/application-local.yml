@@ -26,20 +26,6 @@ correo-argentino:
   simulado: ${CORREO_ARGENTINO_SIMULADO:true}
   codigo-postal-origen: ${CORREO_ARGENTINO_CODIGO_POSTAL_ORIGEN:3177}
 
-# Los mails van a Mailpit (compose.yaml): no salen a internet y se ven en http://localhost:8025
-spring:
-  mail:
-    host: ${MAIL_HOST:localhost}
-    port: ${MAIL_PORT:1025}
-    properties:
-      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
-      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:false}
-
-notificaciones:
-  habilitada: ${NOTIFICACIONES_HABILITADA:true}
-  remitente: ${NOTIFICACIONES_REMITENTE:Tienda Local <ventas@tienda.local>}
-  avisos-vendedor: ${NOTIFICACIONES_AVISOS_VENDEDOR:vendedor@tienda.local}
-
 mercadopago:
   # Por defecto los pagos se simulan (se aprueban al instante, sin Mercado Pago). Para probar con el
   # sandbox real: MP_SIMULADO=false + credenciales de prueba en .env + API expuesta (ej. ngrok).

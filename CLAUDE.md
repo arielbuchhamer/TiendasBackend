@@ -18,15 +18,12 @@ para todas — jamás con `if (tienda == "X")`, forks ni ramas por cliente.
 ## Comandos
 
 ```bash
-SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run   # levanta PostgreSQL y Mailpit (compose.yaml) + app en :8080
+SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run   # levanta PostgreSQL (compose.yaml) + app en :8080
 ./mvnw compile                                         # compilar
 ./mvnw package                                         # jar en target/
 docker build -t tiendas-backend .                      # imagen de producción
-docker compose up -d / docker compose stop             # solo la base local y Mailpit
+docker compose up -d / docker compose stop             # solo la base local
 ```
-
-Mailpit (http://localhost:8025) atrapa los mails que manda la app en local: no salen a internet. Si la base ya
-estaba levantada, Spring no arranca servicios nuevos del compose: `docker compose up -d mailpit`.
 
 Verificar que funciona: levantar con perfil `local` y probar con curl (`/actuator/health`, login
 `admin`/`admin-local-123`). Para requests que modifican datos hay que mandar la cookie `XSRF-TOKEN` en el header
@@ -63,7 +60,6 @@ Paquetes **por funcionalidad** (no por capa técnica), en `src/main/java/com/tie
 | `facturacion` | ARCA vía AFRelay; solo se activa con `facturacion.habilitada=true` (`@FacturacionHabilitada`) |
 | `descuentos` | Cupones (códigos de descuento) y su cálculo en el checkout; módulo opcional (`descuentos.habilitada`) |
 | `envios` | Zonas de envío por código postal, retiro y envío gratis desde un monto; módulo opcional (`envios.habilitada`) |
-| `notificaciones` | Mails de venta pagada al vendedor y al cliente (SMTP + Thymeleaf); módulo opcional (`notificaciones.habilitada`) |
 | `correo` | Correo Argentino (API MiCorreo): cotización, sucursales, alta de envíos y seguimiento; opcional (`correo-argentino.habilitada`) |
 | `desarrollo` | Solo perfil `local`: `DatosEjemplo` (catálogo HA!Tablas) y `PasarelaSimulada` (pagos sin MP) |
 
@@ -129,12 +125,12 @@ Todo en `application.yml` toma valores de variables de entorno; la lista complet
 `.env.example`. Los records `*Properties` (`TiendaProperties`, `MercadoPagoProperties`, `AlmacenamientoProperties`,
 `FacturacionProperties`) se validan al arrancar. Para agregar un parámetro de tienda: campo en el record + entrada
 en `application.yml` con `${VARIABLE}` + documentarlo en `.env.example`.
+En el `.env` local los acentos van escapados (`\u00e9`): Spring lee ese archivo como `.properties` (ISO-8859-1).
 
 ### Módulos opcionales
 
-Una funcionalidad opcional (hoy: facturación, descuentos, envíos, Correo Argentino y notificaciones) se activa por
-instancia con una sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`,
-`CORREO_ARGENTINO_HABILITADA`, `NOTIFICACIONES_HABILITADA`).
+Una funcionalidad opcional (hoy: facturación, descuentos, envíos y Correo Argentino) se activa por instancia con una
+sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`, `CORREO_ARGENTINO_HABILITADA`).
 Esa misma propiedad:
 1. crea o no los beans y endpoints del módulo (anotación condicional, ej. `@FacturacionHabilitada`), y
 2. se informa al frontend en `GET /api/v1/tienda` → `modulos`, para que el panel muestre u oculte la sección.
@@ -241,22 +237,6 @@ piden al Correo) por HTTP Basic en `POST /token` → JWT, que `MiCorreoApi` reut
 - Configuración: `CORREO_ARGENTINO_*` (URL, usuario y clave de la API, número de cliente de MiCorreo y código postal
   de origen = el del domicilio de remitente). `GET /tienda` informa `modulos.correoArgentino`.
 - Pendiente: probar contra la API de TEST cuando el Correo entregue las credenciales.
-
-### Notificaciones por mail
-
-Paquete `notificaciones`. `PedidoService` publica `PedidoPagado` al aprobar un pedido (o al dejarlo en revisión);
-`CorreoVentas` lo escucha **después del commit** y manda en un hilo virtual: un SMTP lento o caído nunca demora ni
-revierte el pago (los errores quedan en el log).
-
-- Aviso al vendedor (`NOTIFICACIONES_AVISOS_VENDEDOR`, con reply-to al cliente) y confirmación al cliente
-  (`NOTIFICACIONES_MAIL_CLIENTE`). Un pedido en revisión solo avisa al vendedor.
-- Plantillas en `src/main/resources/mails/*.html` (Thymeleaf standalone, sin la integración web): HTML de mail
-  (tablas y estilos en línea). Los datos llegan como mapas desde `VistaPedido` (montos, fechas en hora argentina,
-  links de WhatsApp); Thymeleaf standalone no lee accessors de records.
-- Marca por configuración, nada en el código: remitente, logo (recurso de Spring, se adjunta embebido con
-  `cid:logo`), color, WhatsApp de la tienda y el texto de "próximo paso" para el cliente.
-- SMTP con las propiedades estándar `spring.mail.*` (variables `MAIL_*`). En el perfil local va a Mailpit.
-- En el `.env` local los acentos van escapados (`\u00e9`): Spring lee ese archivo como `.properties` (ISO-8859-1).
 
 ### Frontends
 

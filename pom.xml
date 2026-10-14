@@ -107,15 +107,6 @@
 			<version>${pdfbox.version}</version>
 		</dependency>
 
-		<!-- Notificaciones por mail: SMTP + plantillas HTML (Thymeleaf sin la integración web) -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-mail</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.thymeleaf</groupId>
-			<artifactId>thymeleaf</artifactId>
-		</dependency>
 
 		<dependency>
 			<groupId>org.projectlombok</groupId>
