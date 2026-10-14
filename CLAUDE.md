@@ -192,10 +192,14 @@ en el checkout.
 
 Paquete `envios`. Con el módulo apagado, el checkout usa el costo único de `tienda.envio` (como antes).
 
-- **Zonas** (`ZonaEnvio`): nombre, `codigosPostales` (lista de códigos de 4 dígitos o rangos: `"3164, 3100-3299"`;
-  vacía = resto del país), `precio` o `costoAConvenir` (no se cobra en la web), plazo `diasMin`/`diasMax`, `activa`,
-  `orden`. Para un CP se usa la primera zona activa (por `orden`) que lo incluye; si ninguna, la zona sin códigos.
-  Los CP se comparan por sus 4 dígitos (acepta CPA, ej. "A3164ABC").
+- **Zonas** (`ZonaEnvio`): nombre, `codigosPostales` (lista de códigos de 4 dígitos o rangos: `"3164, 3100-3299"`),
+  `provincias` (códigos de una letra del Correo separados por coma, `"E,S,X"`, ver `Provincias`), `precio` o
+  `costoAConvenir` (no se cobra en la web), plazo `diasMin`/`diasMax`, `activa`, `orden`. Sin códigos ni provincias
+  = resto del país. Elección (`zonaPara`): primero la zona activa (por `orden`) que incluye el CP, después la que
+  incluye la provincia del cliente y si no, la del resto del país. Los CP se comparan por sus 4 dígitos (acepta CPA,
+  ej. "A3164ABC"); los CP de 4 dígitos se repiten entre provincias, por eso las zonas grandes van por provincia.
+  El cotizar y el checkout reciben `provincia` (nombre o código); en SUCURSAL sale de la primera letra del código
+  de la sucursal.
 - **Ajustes** (`AjustesEnvio`, una fila): retiro habilitado y su texto, `envioGratisDesde` (sobre el subtotal; no
   aplica a zonas a convenir).
 - **Checkout**: el front manda `entrega`, la dirección (con CP) y opcionalmente `envioOpcion` (`RETIRO` o
