@@ -62,6 +62,7 @@ Paquetes **por funcionalidad** (no por capa técnica), en `src/main/java/com/tie
 | `envios` | Zonas de envío por código postal, retiro y envío gratis desde un monto; módulo opcional (`envios.habilitada`) |
 | `correo` | Correo Argentino (API MiCorreo): cotización, sucursales, alta de envíos y seguimiento; opcional (`correo-argentino.habilitada`) |
 | `emails` | Emails de pedidos vía Resend; cola `email_pendiente` (outbox) con reintentos; `email.habilitada=true` (`@EmailHabilitado`) |
+| `zipnova` | Zipnova (API de envíos v2, varios transportes): cotización, sucursales, alta, etiqueta y seguimiento; opcional (`zipnova.habilitada`) |
 | `desarrollo` | Solo perfil `local`: `DatosEjemplo` (catálogo HA!Tablas) y `PasarelaSimulada` (pagos sin MP) |
 
 Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (reglas y transacciones) →
@@ -133,9 +134,9 @@ En el `.env` local los acentos van escapados (`\u00e9`): Spring lee ese archivo 
 
 ### Módulos opcionales
 
-Una funcionalidad opcional (hoy: facturación, descuentos, envíos, Correo Argentino y emails) se activa por instancia
-con una sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`,
-`CORREO_ARGENTINO_HABILITADA`, `EMAIL_HABILITADA`). Esa misma propiedad:
+Una funcionalidad opcional (hoy: facturación, descuentos, envíos, Correo Argentino, Zipnova y emails) se activa por
+instancia con una sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`,
+`CORREO_ARGENTINO_HABILITADA`, `ZIPNOVA_HABILITADA`, `EMAIL_HABILITADA`). Esa misma propiedad:
 1. crea o no los beans y endpoints del módulo (anotación condicional, ej. `@FacturacionHabilitada`), y
 2. se informa al frontend en `GET /api/v1/tienda` → `modulos`, para que el panel muestre u oculte la sección.
 
@@ -206,10 +207,11 @@ Paquete `envios`. Con el módulo apagado, el checkout usa el costo único de `ti
   `ZONA-{id}`). `EnvioService#elegir` valida la opción contra el CP y devuelve el precio; el pedido guarda
   `envioOpcion`, `envioDescripcion` (lo que vio el cliente) y `envioAConvenir`. El envío se calcula antes que el
   cupón (el de envío gratis descuenta ese costo).
-- **Endpoints**: `GET /api/v1/envios` y `POST /api/v1/envios/cotizar` (públicos, sin CSRF) para el calculador del
-  front; ABM en `/api/v1/admin/envios/zonas` y `/api/v1/admin/envios/ajustes`.
-- **Peso y medidas** (`Medidas`, embebido en `Producto` y `Categoria`; la categoría es el valor por defecto). Hoy no
-  cambian el precio: quedan para cotizar con un correo.
+- **Endpoints**: `GET /api/v1/envios` y `POST /api/v1/envios/cotizar` (públicos, sin CSRF) para el checkout del
+  front (sin carrito cotiza un paquete por defecto: lo usa el probador del panel); ABM en `/api/v1/admin/envios/zonas` y `/api/v1/admin/envios/ajustes`.
+- **Peso y medidas** (`Medidas`, embebido en `Producto`, `Categoria` y `AjustesEnvio.paquetePorDefecto`): se cotiza
+  con los del producto, si no los de su categoría y si no el paquete por defecto de la tienda (los cuatro datos
+  completos). Solo los usan las zonas cotizadas (Correo, Zipnova).
 - Nombres con "AConvenir": la estrategia de nombres de Hibernate no separa dos mayúsculas seguidas, por eso esos
   campos llevan `@Column(name = ...)` explícito.
 
@@ -241,6 +243,70 @@ piden al Correo) por HTTP Basic en `POST /token` → JWT, que `MiCorreoApi` reut
 - Configuración: `CORREO_ARGENTINO_*` (URL, usuario y clave de la API, número de cliente de MiCorreo y código postal
   de origen = el del domicilio de remitente). `GET /tienda` informa `modulos.correoArgentino`.
 - Pendiente: probar contra la API de TEST cuando el Correo entregue las credenciales.
+
+### Zipnova (API de envíos v2)
+
+Paquete `zipnova`, requiere el módulo de envíos. Zipnova es un agregador: con una sola cuenta cotiza y despacha con
+Andreani, Correo Argentino, OCA y otros transportes con sus propias tarifas (sin contrato con cada uno). Se agregó
+porque el Correo no dio acceso a la API de MiCorreo. Documentación: https://docs.zipnova.com/envios (las páginas
+existen con `.md` al final; el índice `llms.txt` no las lista).
+
+- **API**: base `https://api.zipnova.com.ar/v2`, HTTP Basic con el token y el secret de la cuenta (panel de Zipnova >
+  Configuración > Integraciones > Gestionar credenciales y webhooks). `cuenta-id` y `origen-id` son opcionales: sin
+  ellos `ZipnovaApi` usa la única cuenta de las credenciales (`GET /accounts`) y su origen por defecto
+  (`GET /accounts/{id}/settings` → `default_forward_address_id`).
+- **Interfaz `Zipnova`** con `ZipnovaApi` (real) y `ZipnovaSimulado` (precios, sucursales, alta, etiqueta PDF mínima y
+  seguimiento inventados); el simulado exige el perfil `local` (mismo doble candado que el Correo y los pagos).
+- **Zonas** de tipo `ZIPNOVA`: reusan `correoDomicilio`, `correoSucursal` y `correoExpreso` (domicilio, retiro en
+  sucursal y express). A diferencia del Correo, **nunca quedan "a convenir"**: si Zipnova no cotiza (no responde,
+  falta la localidad o no hay medidas) se usa el precio de la zona como respaldo y, sin precio, no se ofrece envío
+  (`EnvioService#sinCotizacion`). `EnvioService#opcionesZipnova`
+  cotiza con `POST /shipments/quote` mandando **unidades** (`items`, una por unidad del carrito con el peso y las
+  medidas del producto o de su categoría; Zipnova arma los paquetes, `type_packaging=dynamic`) y el destino como
+  código postal + provincia (nombre) + **localidad**: Zipnova identifica el destino por localidad y **sin ella
+  responde 400** (probado), así que sin localidad la zona usa el respaldo sin llamar; el front la pide en el
+  checkout cuando `modulos.zipnova` es true. Acepta acentos y nombres como "Ciudad Autónoma de
+  Buenos Aires" (los resuelve: "Palermo / Capital Federal"). Usa `all_results` (cada forma de entrega con
+  cada transporte habilitado en la cuenta; `results` solo trae la mejor de cada una) filtrando las seleccionables,
+  con `estimated_delivery`; `Zipnova.Cotizacion` devuelve además el destino que entendió Zipnova (identifica la
+  localidad por nombre y, si no la reconoce, por código postal), y el checkout se lo muestra al cliente. El precio es
+  `price_incl_tax` (con IVA y seguro). El plazo sale
+  de `delivery_time.times.total` ("P4DT3H14M": viaje + horas de preparación; el día empezado cuenta entero, como los
+  `min`/`max` viejos que Zipnova va a dejar de mandar). Cotizaciones en caché 30 min.
+- **Despacho**: las opciones llegan como `carrier_dropoff`: el vendedor lleva el paquete a un punto del transporte
+  (con `include_dropoff_points=1` la cotización lista los más cercanos al origen).
+- **Firewall**: la API está detrás de AWS WAF y a conexiones de fuera de Argentina les responde 202 sin cuerpo con
+  `x-amzn-waf-action: challenge`. `ZipnovaApi` lo detecta y falla con un mensaje claro. El servidor de producción
+  tiene que salir por una IP que Zipnova acepte (Argentina, o pedirles que la habiliten).
+- **Opciones**: id `ZIPNOVA-{zona}-{transporte}-{servicio}` (máx. 40, la columna de `pedido.envio_opcion`;
+  `EnvioService#servicioZipnova` lo vuelve a separar para el alta). `OpcionEnvio` trae `transportista`, `logo` y, en
+  el retiro en sucursal (`pickup_point`), `puntos`: hasta 5 sucursales cercanas al destino. El checkout manda
+  `envioSucursal` = id del punto y, aunque la entrega sea SUCURSAL, la `direccion` solo con localidad, provincia y CP:
+  `EnvioService#elegirPuntoZipnova` vuelve a cotizar ese destino y exige que el punto sea uno de los de la opción. Por
+  eso `DireccionEnvio.calle`/`numero` ya no son `@NotBlank`: el checkout los exige solo en DOMICILIO.
+- **Checkout**: guarda en el pedido la forma de despacho de la opción (`envio_logistica`, Zipnova pide usar la de la
+  cotización al crear) y la fecha estimada (`envio_entrega_estimada`); exige teléfono (Zipnova lo pide). El domicilio
+  acepta `indicaciones` (entre calles, timbre), que van con piso y depto en `street_extras` (máx. 190).
+- **Alta** (`ZipnovaEnvios`, `POST /api/v1/admin/pedidos/{id}/zipnova`): solo ventas APROBADAS con opción de Zipnova;
+  `POST /shipments` con `external_id` = `P{id}-{8 del código}`, el transporte, el servicio y la logística elegidos,
+  las unidades y el destinatario (Zipnova exige DNI y teléfono). Lo cobra Zipnova
+  del saldo de la cuenta. Guarda `envioExternoId`, `envioAltaEn`, `envioTransportista`, `envioEstado`,
+  `envioSeguimiento` (código del transporte) y `envioSeguimientoUrl` (página pública).
+- **Guía de despacho**: `GET …/zipnova/guia` → PDF (algunos transportes no usan guía: Zipnova responde 400 y se
+  avisa que alcanza con la etiqueta). **Dónde despachar**: `GET …/zipnova/despacho` → puntos del transporte cerca del
+  CP de la cuenta (`/shipments/{id}/dropoff_locations`). **Cancelar**: `POST …/zipnova/cancelar` (si no se despachó, la
+  venta vuelve a poder crear el envío; si ya se despachó, Zipnova pide el rescate al transporte; su 401 = "no se puede
+  cancelar en este estado"). **Saldo**: `GET /api/v1/admin/zipnova/saldo` (`/accounts/{id}/billing`).
+- **Webhook** (`ZipnovaWebhookController`): `POST /api/v1/webhooks/zipnova/{secreto}` (público, sin CSRF), tópicos
+  `status` y `shipment`. Zipnova no firma los avisos: la URL lleva `ZIPNOVA_WEBHOOK_SECRETO` (≥ 32 caracteres; sin él
+  responde 404) y el cuerpo solo dice qué envío consultar a la API. Responde siempre 200 a un aviso válido (si no,
+  Zipnova reintenta cada hora 12 h). Se configura en Zipnova > Integraciones > Crear webhook con la URL pública.
+- **Etiqueta**: `GET …/zipnova/etiqueta` → PDF. Zipnova responde `{"format","body"}` con el archivo en base64 (409 =
+  todavía la está generando). **Seguimiento**: `POST …/zipnova/seguimiento` consulta el envío y su historial
+  (`/shipments/{id}/tracking`) y actualiza el estado guardado.
+- Zipnova le manda al comprador los mails de seguimiento (configuración de la cuenta); la tienda no los manda.
+- Probado contra la API real (2026-10-16): cuentas, ajustes, saldo y cotizaciones. Pendiente: probar el alta, la etiqueta, la guía y la cancelación (requieren saldo en la cuenta) y
+  el webhook (requiere el backend publicado).
 
 ### Frontends
 
@@ -339,4 +405,5 @@ lugar de crearlo. En GitHub: proteger `main` y `develop` con "Require linear his
 - Limpieza de imágenes huérfanas en el almacenamiento.
 - Descuentos: probar con el sandbox de MP el ítem único que se manda cuando hay cupón (ver "Descuentos").
 - Correo Argentino: probar contra la API de TEST (credenciales pedidas al Correo) y ajustar lo que difiera del manual.
+- Zipnova: probar el alta y la etiqueta con un envío real; ver en qué región puede correr el servidor (firewall).
 - Descuentos (etapa 2, si se pide): promociones automáticas sin código (ej. 2x1, descuento por cantidad).
