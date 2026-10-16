@@ -34,7 +34,7 @@ public class PedidoController {
 	/** Carrito y código para calcular el descuento antes de pagar. El email es opcional. */
 	public record SolicitudCotizacion(@NotBlank @Size(max = 60) String cuponCodigo, @Email @Size(max = 160) String email,
 			@NotNull TipoEntrega entrega, @Size(max = 12) String codigoPostal, @Size(max = 60) String provincia,
-			@Size(max = 40) String envioOpcion,
+			@Size(max = 80) String ciudad, @Size(max = 40) String envioOpcion,
 			@Size(max = 10) String envioSucursal, @Valid @NotEmpty @Size(max = 50) List<PedidoItem> items) {
 	}
 
@@ -66,7 +66,8 @@ public class PedidoController {
 	public CheckoutService.Cotizacion cotizarCupon(@Valid @RequestBody SolicitudCotizacion solicitud,
 			HttpServletRequest request) {
 		return checkoutService.cotizar(solicitud.cuponCodigo(), solicitud.email(), solicitud.entrega(),
-				solicitud.codigoPostal(), solicitud.provincia(), solicitud.envioOpcion(), solicitud.envioSucursal(),
+				solicitud.codigoPostal(), solicitud.provincia(), solicitud.ciudad(), solicitud.envioOpcion(),
+				solicitud.envioSucursal(),
 				solicitud.items(),
 				ipCliente.de(request));
 	}

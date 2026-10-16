@@ -89,7 +89,7 @@ public class CheckoutService {
 	 * al confirmar la compra.
 	 */
 	public Cotizacion cotizar(String cuponCodigo, String email, TipoEntrega entrega, String codigoPostal,
-			String provincia, String envioOpcion, String envioSucursal, List<PedidoItem> items, String ip) {
+			String provincia, String ciudad, String envioOpcion, String envioSucursal, List<PedidoItem> items, String ip) {
 		Pedido solicitud = new Pedido();
 		solicitud.setCuponCodigo(cuponCodigo);
 		solicitud.setEntrega(entrega);
@@ -100,6 +100,7 @@ public class CheckoutService {
 			DireccionEnvio direccion = new DireccionEnvio();
 			direccion.setCodigoPostal(codigoPostal);
 			direccion.setProvincia(provincia);
+			direccion.setCiudad(ciudad);
 			solicitud.setDireccion(direccion);
 		}
 		if (StringUtils.hasText(email)) {
@@ -163,10 +164,12 @@ public class CheckoutService {
 		pedido.setEntrega(solicitud.getEntrega());
 		boolean domicilio = solicitud.getEntrega() == TipoEntrega.DOMICILIO;
 		if (domicilio) {
-			if (completo && solicitud.getDireccion() == null) {
+			DireccionEnvio direccion = solicitud.getDireccion();
+			if (completo && (direccion == null || !StringUtils.hasText(direccion.getCalle())
+					|| !StringUtils.hasText(direccion.getNumero()) || !StringUtils.hasText(direccion.getCiudad()))) {
 				throw new ReglaNegocioException("La dirección es obligatoria para envíos a domicilio");
 			}
-			pedido.setDireccion(solicitud.getDireccion());
+			pedido.setDireccion(direccion);
 		}
 		if (envioService.habilitado()) {
 			aplicarEnvioPorZona(solicitud, pedido, cantidades, completo);
@@ -193,6 +196,7 @@ public class CheckoutService {
 	private void aplicarEnvioPorZona(Pedido solicitud, Pedido pedido, Map<Long, BigDecimal> cantidades, boolean completo) {
 		String codigoPostal = solicitud.getDireccion() == null ? null : solicitud.getDireccion().getCodigoPostal();
 		String provincia = solicitud.getDireccion() == null ? null : solicitud.getDireccion().getProvincia();
+		String ciudad = solicitud.getDireccion() == null ? null : solicitud.getDireccion().getCiudad();
 		boolean faltaDestino = switch (solicitud.getEntrega()) {
 			case DOMICILIO -> !StringUtils.hasText(codigoPostal) && !StringUtils.hasText(provincia);
 			case SUCURSAL -> !StringUtils.hasText(solicitud.getEnvioSucursal());
@@ -204,16 +208,23 @@ public class CheckoutService {
 			return;
 		}
 		EnvioElegido elegido = envioService.elegir(EnvioService.Modalidad.valueOf(solicitud.getEntrega().name()),
-				codigoPostal, provincia, solicitud.getEnvioOpcion(), solicitud.getEnvioSucursal(), pedido.getSubtotal(),
-				cantidades);
+				new EnvioService.Destino(codigoPostal, provincia, ciudad), solicitud.getEnvioOpcion(),
+				solicitud.getEnvioSucursal(), pedido.getSubtotal(), cantidades);
 		OpcionEnvio opcion = elegido.opcion();
 		pedido.setCostoEnvio(opcion.precio());
 		pedido.setEnvioOpcion(opcion.id());
 		pedido.setEnvioDescripcion(opcion.descripcion());
 		pedido.setEnvioAConvenir(opcion.costoAConvenir());
-		if (elegido.sucursal() != null) {
-			pedido.setEnvioSucursal(elegido.sucursal().codigo());
-			pedido.setEnvioSucursalDetalle(elegido.sucursal().detalle());
+		pedido.setEnvioLogistica(opcion.logistica());
+		pedido.setEnvioEntregaEstimada(opcion.entregaEstimada() == null ? null
+				: java.time.LocalDate.parse(opcion.entregaEstimada()));
+		if (completo && EnvioService.servicioZipnova(opcion.id()).isPresent() && (solicitud.getCliente() == null
+				|| !StringUtils.hasText(solicitud.getCliente().getTelefono()))) {
+			throw new ReglaNegocioException("Para el envío necesitamos tu teléfono: el transporte lo pide para entregar");
+		}
+		if (elegido.sucursalCodigo() != null) {
+			pedido.setEnvioSucursal(elegido.sucursalCodigo());
+			pedido.setEnvioSucursalDetalle(elegido.sucursalDetalle());
 		}
 	}
 

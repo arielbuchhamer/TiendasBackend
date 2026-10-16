@@ -19,6 +19,8 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
 	long countByEstadoAndVistoFalse(EstadoPedido estado);
 
+	java.util.Optional<Pedido> findByEnvioExternoId(String envioExternoId);
+
 	/** SELECT ... FOR UPDATE: serializa las notificaciones de pago concurrentes de un mismo pedido. */
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("SELECT p FROM Pedido p WHERE p.codigo = :codigo")

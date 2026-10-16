@@ -8,6 +8,7 @@ import com.tiendas.descuentos.DescuentosProperties;
 import com.tiendas.emails.EmailProperties;
 import com.tiendas.envios.EnviosProperties;
 import com.tiendas.facturacion.FacturacionProperties;
+import com.tiendas.zipnova.ZipnovaProperties;
 
 /**
  * Configuración pública de la tienda que necesita el frontend: nombre, moneda, opciones de entrega y
@@ -23,16 +24,19 @@ class TiendaController {
 	 * Módulos opcionales. Cada valor sale de la misma propiedad que activa el módulo en el backend, así
 	 * el panel nunca muestra una sección cuyos endpoints no existen (ni al revés).
 	 */
-	record Modulos(boolean facturacion, boolean descuentos, boolean envios, boolean correoArgentino, boolean email) {
+	record Modulos(boolean facturacion, boolean descuentos, boolean envios, boolean correoArgentino, boolean email,
+			boolean zipnova) {
 	}
 
 	private final InfoTienda info;
 
 	TiendaController(TiendaProperties tienda, FacturacionProperties facturacion, DescuentosProperties descuentos,
-			EnviosProperties envios, CorreoArgentinoProperties correo, EmailProperties email) {
+			EnviosProperties envios, CorreoArgentinoProperties correo, EmailProperties email,
+			ZipnovaProperties zipnova) {
 		this.info = new InfoTienda(tienda.nombre(), tienda.moneda(), tienda.envio(),
 				new Modulos(facturacion.habilitada(), descuentos.habilitada(), envios.habilitada(),
-						envios.habilitada() && correo.habilitada(), email.habilitada()));
+						envios.habilitada() && correo.habilitada(), email.habilitada(),
+						envios.habilitada() && zipnova.habilitada()));
 	}
 
 	@GetMapping("/api/v1/tienda")

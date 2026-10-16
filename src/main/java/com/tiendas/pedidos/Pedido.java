@@ -55,7 +55,10 @@ public class Pedido extends EntidadBase {
 	@Column(nullable = false)
 	private TipoEntrega entrega;
 
-	/** Obligatoria si la entrega es a domicilio. */
+	/**
+	 * Obligatoria si la entrega es a domicilio. En el retiro en sucursal de Zipnova llegan solo localidad, provincia
+	 * y código postal (para validar la sucursal) y no se guarda.
+	 */
 	@Valid
 	@Embedded
 	private DireccionEnvio direccion;
@@ -77,7 +80,10 @@ public class Pedido extends EntidadBase {
 	@JsonProperty(access = Access.READ_ONLY)
 	private String envioDescripcion;
 
-	/** Sucursal de Correo Argentino donde retira el cliente (solo entrega SUCURSAL), ej. "E0101". */
+	/**
+	 * Sucursal donde retira el cliente (solo entrega SUCURSAL): el código del Correo (ej. "E0101") o el id del punto
+	 * de retiro de Zipnova.
+	 */
 	@Size(max = 10)
 	private String envioSucursal;
 
@@ -89,9 +95,37 @@ public class Pedido extends EntidadBase {
 	@JsonProperty(access = Access.READ_ONLY)
 	private Instant correoImportadoEn;
 
-	/** Código de seguimiento del paquete (lo carga el vendedor después de despachar). */
+	/** Código de seguimiento del paquete (lo carga el vendedor después de despachar, o lo informa Zipnova). */
 	@JsonProperty(access = Access.READ_ONLY)
 	private String envioSeguimiento;
+
+	/** Forma de despacho de la opción de Zipnova elegida (ej. "carrier_dropoff"); se usa al crear el envío. */
+	@JsonIgnore
+	private String envioLogistica;
+
+	/** Fecha estimada de entrega que informó Zipnova al cotizar. */
+	@JsonProperty(access = Access.READ_ONLY)
+	private java.time.LocalDate envioEntregaEstimada;
+
+	/** Id del envío en Zipnova (null = todavía no se dio de alta). */
+	@JsonProperty(access = Access.READ_ONLY)
+	private String envioExternoId;
+
+	/** Cuándo se dio de alta el envío en Zipnova. */
+	@JsonProperty(access = Access.READ_ONLY)
+	private Instant envioAltaEn;
+
+	/** Transporte que lleva el paquete (ej. "Andreani"), según Zipnova. */
+	@JsonProperty(access = Access.READ_ONLY)
+	private String envioTransportista;
+
+	/** Último estado del envío que informó Zipnova (ej. "En camino"). */
+	@JsonProperty(access = Access.READ_ONLY)
+	private String envioEstado;
+
+	/** Página pública de seguimiento del envío, para pasarle al cliente. */
+	@JsonProperty(access = Access.READ_ONLY)
+	private String envioSeguimientoUrl;
 
 	/** El costo del envío no se cobró en la web: se arregla con el cliente. */
 	@JsonProperty(access = Access.READ_ONLY)

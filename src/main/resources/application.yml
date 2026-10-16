@@ -146,6 +146,16 @@ correo-argentino:
   codigo-postal-origen: ${CORREO_ARGENTINO_CODIGO_POSTAL_ORIGEN:}
   simulado: ${CORREO_ARGENTINO_SIMULADO:false}
 
+zipnova:
+  habilitada: ${ZIPNOVA_HABILITADA:false}
+  url: ${ZIPNOVA_URL:https://api.zipnova.com.ar/v2}
+  api-token: ${ZIPNOVA_API_TOKEN:}
+  api-secret: ${ZIPNOVA_API_SECRET:}
+  cuenta-id: ${ZIPNOVA_CUENTA_ID:}
+  origen-id: ${ZIPNOVA_ORIGEN_ID:}
+  simulado: ${ZIPNOVA_SIMULADO:false}
+  webhook-secreto: ${ZIPNOVA_WEBHOOK_SECRETO:}
+
 facturacion:
   habilitada: ${FACTURACION_HABILITADA:false}
   punto-venta: ${FACTURACION_PUNTO_VENTA:1}

@@ -35,7 +35,7 @@ class EnvioController {
 
 	/** Carrito para cotizar (variante y cantidad); el subtotal lo calcula el servidor. */
 	record SolicitudCotizacion(@Size(max = 12) String codigoPostal, @Size(max = 60) String provincia,
-			@Valid @Size(max = 50) List<Linea> items) {
+			@Size(max = 80) String ciudad, @Valid @Size(max = 50) List<Linea> items) {
 	}
 
 	record Linea(@NotNull Long varianteId, @NotNull @Positive @Digits(integer = 11, fraction = 3) BigDecimal cantidad) {
@@ -66,7 +66,8 @@ class EnvioController {
 		if (solicitud.items() != null) {
 			solicitud.items().forEach(l -> cantidades.merge(l.varianteId(), l.cantidad(), BigDecimal::add));
 		}
-		return envioService.cotizar(solicitud.codigoPostal(), solicitud.provincia(), cantidades);
+		return envioService.cotizar(
+				new EnvioService.Destino(solicitud.codigoPostal(), solicitud.provincia(), solicitud.ciudad()), cantidades);
 	}
 
 	// ─── Panel ──────────────────────────────────────────────────────────

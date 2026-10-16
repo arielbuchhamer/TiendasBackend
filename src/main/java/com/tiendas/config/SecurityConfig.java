@@ -66,7 +66,7 @@ public class SecurityConfig {
 								"/api/v1/imagenes/**",
 								"/api/v1/comprobantes/*/pdf").permitAll()
 						.requestMatchers(POST, "/api/v1/checkout", "/api/v1/checkout/cupon", "/api/v1/envios/cotizar",
-								"/api/v1/webhooks/mercadopago").permitAll()
+								"/api/v1/webhooks/mercadopago", "/api/v1/webhooks/zipnova/*").permitAll()
 						.requestMatchers("/api/v1/auth/**").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/health/**", "/error").permitAll()
 						.anyRequest().denyAll())

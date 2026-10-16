@@ -12,12 +12,12 @@ import lombok.Setter;
 @Embeddable
 public class DireccionEnvio {
 
-	@NotBlank
+	// Calle y número los exige el checkout solo en la entrega a domicilio: el retiro en una sucursal de Zipnova
+	// manda únicamente localidad, provincia y código postal
 	@Size(max = 120)
 	@Column(name = "envio_calle")
 	private String calle;
 
-	@NotBlank
 	@Size(max = 20)
 	@Column(name = "envio_numero")
 	private String numero;
@@ -44,4 +44,9 @@ public class DireccionEnvio {
 	@Size(max = 12)
 	@Column(name = "envio_codigo_postal")
 	private String codigoPostal;
+
+	/** Indicaciones para el repartidor (entre calles, timbre, referencias). Opcional. */
+	@Size(max = 150)
+	@Column(name = "envio_indicaciones")
+	private String indicaciones;
 }

@@ -2,9 +2,12 @@ package com.tiendas.envios;
 
 import java.math.BigDecimal;
 
+import com.tiendas.catalogo.Medidas;
 import com.tiendas.comun.EntidadBase;
 
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
@@ -27,4 +30,12 @@ public class AjustesEnvio extends EntidadBase {
 	@Positive
 	@Digits(integer = 12, fraction = 2)
 	private BigDecimal envioGratisDesde;
+
+	/**
+	 * Peso y medidas con los que se cotiza un producto que no tiene los suyos ni los de su categoría. Sin este
+	 * paquete, un carrito con productos sin medidas no se puede cotizar con el Correo ni con Zipnova.
+	 */
+	@Valid
+	@Embedded
+	private Medidas paquetePorDefecto;
 }

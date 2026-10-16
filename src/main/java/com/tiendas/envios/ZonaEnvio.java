@@ -46,8 +46,8 @@ public class ZonaEnvio extends EntidadBase {
 	private String provincias;
 
 	/**
-	 * Obligatorio salvo que el costo sea a convenir. En las zonas de Correo Argentino es opcional: es el precio de
-	 * respaldo si el Correo no puede cotizar (sin precio, el costo queda a convenir).
+	 * Obligatorio salvo que el costo sea a convenir. En las zonas de Correo Argentino y de Zipnova es opcional: es
+	 * el precio de respaldo si no se puede cotizar (sin precio, el costo queda a convenir).
 	 */
 	@PositiveOrZero
 	@Digits(integer = 12, fraction = 2)
@@ -67,7 +67,8 @@ public class ZonaEnvio extends EntidadBase {
 
 	private boolean activa = true;
 
-	// Servicios que ofrece una zona de Correo Argentino
+	// Servicios que ofrece una zona de Correo Argentino o de Zipnova (los nombres vienen de cuando solo existía el
+	// Correo): domicilio, retiro en sucursal y Expreso / express
 	private boolean correoDomicilio = true;
 
 	private boolean correoSucursal = true;
