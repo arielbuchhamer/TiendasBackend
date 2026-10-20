@@ -70,13 +70,26 @@ docker build -t tiendas-backend .    # imagen de producción (usuario sin privil
 
 ## Desplegar una tienda nueva en Railway
 
-1. Crear un **proyecto** en Railway para la tienda y agregar un servicio **PostgreSQL**.
+1. Crear un **proyecto** en Railway para la tienda y agregar un servicio **PostgreSQL** (región US East, la más
+   cercana a Argentina).
 2. Agregar un servicio desde este repositorio de GitHub. Usa el `Dockerfile` y `railway.json`
-   (healthcheck en `/actuator/health/readiness`).
-3. En *Settings → Source* elegir qué desplegar: la rama `main` o, mejor, fijar un **tag** (`v1.3.0`) para
-   controlar cuándo se actualiza cada cliente.
-4. Cargar las variables (ver `.env.example`):
-   - Base de datos: `PGHOST=${{Postgres.PGHOST}}`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` (referencias al servicio Postgres).
+   (healthcheck en `/actuator/health/readiness`). En *Settings → Networking* generar el dominio (puerto `8080`) y
+   elegir la misma región que la base.
+3. En *Settings → Source* elegir qué desplegar: la rama `main` (solo avanza al publicar una versión) o fijar un
+   **tag** (`v1.3.0`) para controlar cuándo se actualiza cada cliente.
+4. Cargar las variables (ver `.env.example`). **Los cambios de variables quedan pendientes** hasta tocar *Deploy*
+   en el aviso que aparece arriba del proyecto; revisar que se cree un deploy nuevo antes de leer los logs.
+   - Base de datos: la URL escrita entera, sin referencias (las referencias a `PGHOST`/`PGPORT` del Postgres de
+     Railway llegaron vacías y la app no arrancaba). Host y base se ven en las variables del servicio Postgres:
+     ```bash
+     SPRING_DATASOURCE_URL=jdbc:postgresql://postgres.railway.internal:5432/railway
+     SPRING_DATASOURCE_USERNAME=${{Postgres.PGUSER}}
+     SPRING_DATASOURCE_PASSWORD=${{Postgres.PGPASSWORD}}
+     ```
+     Tiene que empezar con `jdbc:` (la `DATABASE_URL` de Railway no sirve tal cual). No definir
+     `SPRING_JPA_HIBERNATE_DDL_AUTO` (el esquema es de Flyway) ni `SPRING_PROFILES_ACTIVE`.
+   - Memoria (Railway cobra la RAM usada; sin esto la JVM toma bastante más de lo que necesita):
+     `JAVA_TOOL_OPTIONS=-Xmx320m -XX:+UseSerialGC -Xss512k -XX:+ExitOnOutOfMemoryError` y `DB_POOL_MAX=5`.
    - Tienda: `TIENDA_NOMBRE`, `TIENDA_FRONTEND_URL`, `TIENDA_API_URL`, `TIENDA_CORS_ORIGENES`, `TIENDA_COOKIES_DOMINIO`.
    - Mercado Pago: `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`.
    - Archivos: `ALMACENAMIENTO_TIPO=S3` + `ALMACENAMIENTO_S3_*` (un bucket **privado** por tienda).
@@ -94,6 +107,11 @@ docker build -t tiendas-backend .    # imagen de producción (usuario sin privil
    copiar la clave secreta en `MP_WEBHOOK_SECRET`.
 
 Si falta una variable obligatoria, la aplicación **no arranca** y el log indica cuál.
+
+Verificar: `GET /actuator/health` → `{"status":"UP"}` y `GET /api/v1/tienda`; después, login con el admin inicial
+(ver "Para el frontend": el `POST` lleva la cookie `XSRF-TOKEN` en el header `X-XSRF-TOKEN`) y borrar las variables
+`TIENDA_ADMIN_INICIAL_*`. Con el dominio `*.up.railway.app` el panel no funciona desde un front en otro dominio
+(el front no puede leer la cookie CSRF): para usar la tienda hace falta el dominio propio del paso 5.
 
 ### Alternativa: varias tiendas en un servidor propio
 
