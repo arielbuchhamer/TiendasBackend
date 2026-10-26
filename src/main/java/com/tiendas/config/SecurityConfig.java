@@ -24,6 +24,8 @@ import org.springframework.security.web.authentication.logout.HttpStatusReturnin
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -53,6 +55,14 @@ public class SecurityConfig {
 						.csrfTokenRepository(csrfTokenRepository)
 						.ignoringRequestMatchers("/api/v1/webhooks/**", "/api/v1/checkout", "/api/v1/checkout/cupon",
 								"/api/v1/envios/cotizar"))
+				// El token CSRF es diferido: sin esto la cookie XSRF-TOKEN recién llega en la respuesta (403) del
+				// primer POST, y el primer login siempre falla. Leerlo en cada request la manda desde el primer GET.
+				.addFilterAfter((request, response, chain) -> {
+					if (request.getAttribute(CsrfToken.class.getName()) instanceof CsrfToken token) {
+						token.getToken();
+					}
+					chain.doFilter(request, response);
+				}, CsrfFilter.class)
 				.securityContext(contexto -> contexto.securityContextRepository(securityContextRepository))
 				.authorizeHttpRequests(rutas -> rutas
 						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
