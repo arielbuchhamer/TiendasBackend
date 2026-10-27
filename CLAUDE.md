@@ -63,6 +63,7 @@ Paquetes **por funcionalidad** (no por capa técnica), en `src/main/java/com/tie
 | `correo` | Correo Argentino (API MiCorreo): cotización, sucursales, alta de envíos y seguimiento; opcional (`correo-argentino.habilitada`) |
 | `emails` | Emails de pedidos vía Resend; cola `email_pendiente` (outbox) con reintentos; `email.habilitada=true` (`@EmailHabilitado`) |
 | `zipnova` | Zipnova (API de envíos v2, varios transportes): cotización, sucursales, alta, etiqueta y seguimiento; opcional (`zipnova.habilitada`) |
+| `personalizacion` | Personalización de productos (ej. grabado) con precio único editable en el panel; opcional (`personalizacion.habilitada`) |
 | `desarrollo` | Solo perfil `local`: `DatosEjemplo` (catálogo HA!Tablas) y `PasarelaSimulada` (pagos sin MP) |
 
 Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (reglas y transacciones) →
@@ -134,16 +135,16 @@ En el `.env` local los acentos van escapados (`\u00e9`): Spring lee ese archivo 
 
 ### Módulos opcionales
 
-Una funcionalidad opcional (hoy: facturación, descuentos, envíos, Correo Argentino, Zipnova y emails) se activa por
+Una funcionalidad opcional (hoy: facturación, descuentos, envíos, Correo Argentino, Zipnova, emails y personalización) se activa por
 instancia con una sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`,
-`CORREO_ARGENTINO_HABILITADA`, `ZIPNOVA_HABILITADA`, `EMAIL_HABILITADA`). Esa misma propiedad:
+`CORREO_ARGENTINO_HABILITADA`, `ZIPNOVA_HABILITADA`, `EMAIL_HABILITADA`, `PERSONALIZACION_HABILITADA`). Esa misma propiedad:
 1. crea o no los beans y endpoints del módulo (anotación condicional, ej. `@FacturacionHabilitada`), y
 2. se informa al frontend en `GET /api/v1/tienda` → `modulos`, para que el panel muestre u oculte la sección.
 
 No crear flags de "visibilidad" separados del flag que activa el módulo: podrían quedar desincronizados.
 Para un módulo nuevo: propiedad `xxx.habilitada`, anotación condicional propia y campo en `TiendaController.Modulos`.
 
-Excepción en descuentos y envíos: `CuponService`, `EnvioService` y sus entidades existen siempre (el checkout los necesita y la tabla
+Excepción en descuentos, envíos y personalización: `CuponService`, `EnvioService`, `PersonalizacionService` y sus entidades existen siempre (el checkout los necesita y la tabla
 siempre está); con el módulo apagado `CuponService#aplicar` rechaza cualquier código y solo el ABM del panel
 (`CuponController`, `@DescuentosHabilitada`) deja de existir.
 
@@ -214,6 +215,26 @@ Paquete `envios`. Con el módulo apagado, el checkout usa el costo único de `ti
   completos). Solo los usan las zonas cotizadas (Correo, Zipnova).
 - Nombres con "AConvenir": la estrategia de nombres de Hibernate no separa dos mayúsculas seguidas, por eso esos
   campos llevan `@Column(name = ...)` explícito.
+
+### Personalización y servicios
+
+Paquete `personalizacion` (módulo opcional) y el flag `Producto.servicio`. Nació para HA!Tablas (el grabado se vende
+aparte del producto), pero es genérico: cualquier tienda puede ofrecer un adicional por unidad.
+
+- **Ajustes** (`AjustesPersonalizacion`, una fila): `nombre` (lo que ve el cliente, ej. "Grabado"), `precio` único
+  por unidad y `detalle` (texto de ayuda). `GET /api/v1/personalizacion` (público, en la caché `catalogo`) y
+  `PUT /api/v1/admin/personalizacion`; los dos existen solo con el módulo activo.
+- **Checkout**: cada ítem manda `personalizado` y opcionalmente `personalizacionDetalle` (qué grabar, máx. 300).
+  `CheckoutService` agrupa las líneas por variante + personalización + detalle (la misma variante con y sin grabado
+  son líneas distintas), pero el stock y el envío se calculan con la cantidad total de cada variante. El precio de la
+  personalización se suma al `precioUnitario` y la línea guarda una copia (`personalizacionNombre`,
+  `personalizacionPrecio`). Con el módulo apagado, o en un servicio, `PersonalizacionService#aplicar` rechaza la línea.
+- **Servicios** (`Producto.servicio`, ej. grabar piezas que trae el cliente): sin stock (no se valida ni se descuenta al
+  aprobar), sin bultos para cotizar (`EnvioService#paquetes` los saltea) y sin personalización. Un carrito de puros
+  servicios no cotiza envío ni pide dirección: el pedido queda como `RETIRO`, costo 0 y "a convenir" (la tienda
+  arregla con el cliente cómo le llegan las piezas).
+- **Categoría opcional**: `producto.categoria_id` admite NULL (V10) para que un servicio no aparezca en ningún rubro.
+  Todo lo que agrupa por categoría (cupones por rubro, medidas por categoría) tiene que tolerar el null.
 
 ### Correo Argentino (API MiCorreo)
 
