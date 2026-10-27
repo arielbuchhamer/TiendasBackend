@@ -42,8 +42,7 @@ import lombok.Setter;
 @Entity
 public class Producto extends EntidadBase {
 
-	@NotNull
-	@Column(nullable = false)
+	/** Opcional: un servicio puede no estar en ninguna categoría (no aparece en los rubros del catálogo). */
 	private Long categoriaId;
 
 	@NotBlank
@@ -67,6 +66,12 @@ public class Producto extends EntidadBase {
 	private boolean activo = true;
 
 	private boolean destacado;
+
+	/**
+	 * Un servicio (ej. grabar piezas que trae el cliente) no lleva stock ni envío y no admite personalización:
+	 * el checkout no controla ni descuenta su stock y no lo cotiza con los transportes.
+	 */
+	private boolean servicio;
 
 	/** Peso y medidas del paquete; si no tiene, se usan los de su categoría. */
 	@Valid

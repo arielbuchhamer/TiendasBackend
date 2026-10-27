@@ -145,10 +145,15 @@ public class PedidoService {
 		Map<Long, BigDecimal> cantidades = pedido.getItems().stream()
 				.collect(Collectors.toMap(PedidoItem::getVarianteId, PedidoItem::getCantidad, BigDecimal::add));
 		// Bloquea las filas de stock: dos pedidos que compiten por la última unidad se procesan de a uno
-		List<Variante> variantes = varianteRepository.bloquearParaActualizar(cantidades.keySet());
-
-		boolean hayStock = variantes.size() == cantidades.size()
-				&& variantes.stream().allMatch(v -> v.getStock().compareTo(cantidades.get(v.getId())) >= 0);
+		List<Variante> bloqueadas = varianteRepository.bloquearParaActualizar(cantidades.keySet());
+		if (bloqueadas.size() != cantidades.size()) {
+			log.warn("Pedido {} pagado con variantes que ya no existen: requiere revisión", pedido.getCodigo());
+			pedido.setEstado(EstadoPedido.REQUIERE_REVISION);
+			return;
+		}
+		// Los servicios no tienen stock
+		List<Variante> variantes = bloqueadas.stream().filter(v -> !v.getProducto().isServicio()).toList();
+		boolean hayStock = variantes.stream().allMatch(v -> v.getStock().compareTo(cantidades.get(v.getId())) >= 0);
 		if (!hayStock) {
 			log.warn("Pedido {} pagado sin stock suficiente: requiere revisión", pedido.getCodigo());
 			pedido.setEstado(EstadoPedido.REQUIERE_REVISION);

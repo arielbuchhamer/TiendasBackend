@@ -3,6 +3,7 @@ package com.tiendas.pedidos;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,8 @@ import com.tiendas.descuentos.TipoCupon;
 import com.tiendas.envios.EnvioService;
 import com.tiendas.envios.EnvioService.EnvioElegido;
 import com.tiendas.envios.EnvioService.OpcionEnvio;
+import com.tiendas.personalizacion.AjustesPersonalizacion;
+import com.tiendas.personalizacion.PersonalizacionService;
 
 /**
  * Inicia una compra: valida el carrito contra la base, calcula precios y totales en el servidor
@@ -42,6 +45,9 @@ public class CheckoutService {
 
 	private static final Logger log = LoggerFactory.getLogger(CheckoutService.class);
 
+	/** Lo que ve el cliente en un pedido de puros servicios. */
+	private static final String SIN_ENVIO = "Sin envío: lo coordinamos con vos";
+
 	/** Importes de un carrito con un cupón aplicado, para mostrarlos antes de pagar. */
 	public record Cotizacion(String cuponCodigo, TipoCupon tipo, BigDecimal subtotal, BigDecimal costoEnvio,
 			String envioDescripcion, boolean envioAConvenir, BigDecimal descuento, BigDecimal total) {
@@ -54,10 +60,11 @@ public class CheckoutService {
 	private final TiendaProperties tienda;
 	private final CuponService cuponService;
 	private final EnvioService envioService;
+	private final PersonalizacionService personalizacionService;
 
 	public CheckoutService(VarianteRepository varianteRepository, PedidoRepository pedidoRepository,
 			PasarelaPago pasarelaPago, TransactionTemplate transaccion, TiendaProperties tienda,
-			CuponService cuponService, EnvioService envioService) {
+			CuponService cuponService, EnvioService envioService, PersonalizacionService personalizacionService) {
 		this.varianteRepository = varianteRepository;
 		this.pedidoRepository = pedidoRepository;
 		this.pasarelaPago = pasarelaPago;
@@ -65,6 +72,7 @@ public class CheckoutService {
 		this.tienda = tienda;
 		this.cuponService = cuponService;
 		this.envioService = envioService;
+		this.personalizacionService = personalizacionService;
 	}
 
 	/** @param ip IP del comprador, para frenar a quien prueba códigos de cupón al azar */
@@ -116,9 +124,15 @@ public class CheckoutService {
 
 	/** @param completo si es un pedido real (exige la dirección de envío) o solo una cotización */
 	private Pedido armarPedido(Pedido solicitud, String ip, boolean completo) {
-		Map<Long, BigDecimal> cantidades = agruparCantidades(solicitud.getItems());
+		List<LineaCarrito> carrito = agruparLineas(solicitud.getItems());
+		// El stock y el envío se miran por variante: la misma variante con y sin personalización suma
+		Map<Long, BigDecimal> cantidades = new LinkedHashMap<>();
+		carrito.forEach(linea -> cantidades.merge(linea.varianteId(), linea.cantidad(), BigDecimal::add));
 		Map<Long, Variante> variantes = varianteRepository.buscarConProducto(cantidades.keySet()).stream()
 				.collect(Collectors.toMap(Variante::getId, Function.identity()));
+		cantidades.forEach((id, cantidad) -> validarDisponible(variantes.get(id), id, cantidad));
+		AjustesPersonalizacion personalizacion = carrito.stream().anyMatch(LineaCarrito::personalizado)
+				? personalizacionService.ajustes() : null;
 
 		Pedido pedido = new Pedido();
 		pedido.setCodigo(UUID.randomUUID());
@@ -128,16 +142,20 @@ public class CheckoutService {
 
 		BigDecimal subtotal = BigDecimal.ZERO;
 		List<LineaCompra> lineas = new ArrayList<>();
-		for (Map.Entry<Long, BigDecimal> linea : cantidades.entrySet()) {
-			Variante variante = variantes.get(linea.getKey());
-			PedidoItem item = crearItem(variante, linea.getKey(), linea.getValue());
+		for (LineaCarrito linea : carrito) {
+			Variante variante = variantes.get(linea.varianteId());
+			PedidoItem item = crearItem(variante, linea, personalizacion);
 			pedido.agregarItem(item);
 			subtotal = subtotal.add(item.getSubtotal());
 			lineas.add(new LineaCompra(variante.getProducto().getId(), variante.getProducto().getCategoriaId(),
 					item.getSubtotal()));
 		}
 		pedido.setSubtotal(subtotal);
-		aplicarEntrega(solicitud, pedido, completo, cantidades);
+		if (variantes.values().stream().allMatch(v -> v.getProducto().isServicio())) {
+			aplicarSinEnvio(pedido);
+		} else {
+			aplicarEntrega(solicitud, pedido, completo, cantidades);
+		}
 		aplicarCupon(solicitud, pedido, lineas, ip);
 		pedido.setTotal(subtotal.add(pedido.getCostoEnvio()).subtract(pedido.getDescuento()));
 		if (pedido.getTotal().signum() <= 0) {
@@ -157,6 +175,17 @@ public class CheckoutService {
 		pedido.setCuponId(aplicado.cupon().getId());
 		pedido.setCuponCodigo(aplicado.cupon().getCodigo());
 		pedido.setDescuento(aplicado.descuento());
+	}
+
+	/**
+	 * Un carrito de puros servicios no viaja: no se cotiza envío ni se pide dirección, y la entrega (ej. cómo el
+	 * cliente hace llegar sus piezas) se arregla con la tienda.
+	 */
+	private static void aplicarSinEnvio(Pedido pedido) {
+		pedido.setEntrega(TipoEntrega.RETIRO);
+		pedido.setCostoEnvio(BigDecimal.ZERO);
+		pedido.setEnvioAConvenir(true);
+		pedido.setEnvioDescripcion(SIN_ENVIO);
 	}
 
 	/** Necesita el subtotal ya calculado: el envío puede ser gratis a partir de un monto. */
@@ -228,20 +257,36 @@ public class CheckoutService {
 		}
 	}
 
-	private static PedidoItem crearItem(Variante variante, Long varianteId, BigDecimal cantidad) {
+	/** Recibe la cantidad total de la variante en el carrito (sumando las líneas con y sin personalización). */
+	private static void validarDisponible(Variante variante, Long varianteId, BigDecimal cantidad) {
 		if (variante == null || !variante.isActivo() || !variante.getProducto().isActivo()) {
 			throw new ReglaNegocioException("El producto " + varianteId + " no está disponible");
 		}
+		// Los servicios no tienen stock
+		if (!variante.getProducto().isServicio() && variante.getStock().compareTo(cantidad) < 0) {
+			throw new ReglaNegocioException("No hay stock suficiente de " + variante.getProducto().getNombre());
+		}
+	}
+
+	/** @param personalizacion ajustes vigentes; null si ninguna línea del carrito está personalizada */
+	private PedidoItem crearItem(Variante variante, LineaCarrito linea, AjustesPersonalizacion personalizacion) {
 		String nombre = variante.getProducto().getNombre();
+		BigDecimal cantidad = linea.cantidad();
 		if (!variante.getProducto().getUnidadVenta().admiteDecimales() && cantidad.stripTrailingZeros().scale() > 0) {
 			throw new ReglaNegocioException("La cantidad de " + nombre + " debe ser un número entero");
-		}
-		if (variante.getStock().compareTo(cantidad) < 0) {
-			throw new ReglaNegocioException("No hay stock suficiente de " + nombre);
 		}
 
 		BigDecimal precio = variante.precioEfectivo();
 		PedidoItem item = new PedidoItem();
+		if (linea.personalizado()) {
+			PersonalizacionService.Aplicada aplicada = personalizacionService.aplicar(variante.getProducto(),
+					personalizacion);
+			item.setPersonalizado(true);
+			item.setPersonalizacionNombre(aplicada.nombre());
+			item.setPersonalizacionPrecio(aplicada.precio());
+			item.setPersonalizacionDetalle(linea.detalle());
+			precio = precio.add(aplicada.precio());
+		}
 		item.setVarianteId(variante.getId());
 		item.setCantidad(cantidad);
 		item.setProductoNombre(nombre);
@@ -255,10 +300,20 @@ public class CheckoutService {
 		return item;
 	}
 
-	// Si el carrito trae la misma variante en dos líneas, se suman (así la validación de stock es correcta)
-	private static Map<Long, BigDecimal> agruparCantidades(List<PedidoItem> items) {
-		Map<Long, BigDecimal> cantidades = new LinkedHashMap<>();
-		items.forEach(item -> cantidades.merge(item.getVarianteId(), item.getCantidad(), BigDecimal::add));
-		return cantidades;
+	/** Una línea del carrito: la misma variante con y sin personalización (o con otro pedido) son líneas distintas. */
+	private record LineaCarrito(Long varianteId, boolean personalizado, String detalle, BigDecimal cantidad) {
+	}
+
+	// Si el carrito trae dos líneas iguales (misma variante y misma personalización), se suman
+	private static List<LineaCarrito> agruparLineas(List<PedidoItem> items) {
+		Map<List<Object>, LineaCarrito> lineas = new LinkedHashMap<>();
+		for (PedidoItem item : items) {
+			String detalle = item.isPersonalizado() && StringUtils.hasText(item.getPersonalizacionDetalle())
+					? item.getPersonalizacionDetalle().trim() : null;
+			LineaCarrito linea = new LineaCarrito(item.getVarianteId(), item.isPersonalizado(), detalle, item.getCantidad());
+			lineas.merge(Arrays.asList(linea.varianteId(), linea.personalizado(), detalle), linea,
+					(a, b) -> new LineaCarrito(a.varianteId(), a.personalizado(), a.detalle(), a.cantidad().add(b.cantidad())));
+		}
+		return List.copyOf(lineas.values());
 	}
 }

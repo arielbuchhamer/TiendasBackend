@@ -6,6 +6,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -141,9 +142,13 @@ public class CuponService {
 
 	/** Suma de las líneas que el cupón alcanza (todas, si el cupón es para toda la tienda). */
 	private BigDecimal baseAlcanzada(Cupon cupon, List<LineaCompra> lineas) {
-		Map<Long, Long> rubroDeCategoria = cupon.getRubros().isEmpty() ? Map.of()
-				: categoriaRepository.findAllById(lineas.stream().map(LineaCompra::categoriaId).collect(Collectors.toSet()))
-						.stream().collect(Collectors.toMap(Categoria::getId, Categoria::getRubroId));
+		// HashMap y no Map.of(): los productos sin categoría buscan con clave null
+		Map<Long, Long> rubroDeCategoria = new HashMap<>();
+		if (!cupon.getRubros().isEmpty()) {
+			categoriaRepository.findAllById(lineas.stream().map(LineaCompra::categoriaId).filter(Objects::nonNull)
+					.collect(Collectors.toSet()))
+					.forEach(c -> rubroDeCategoria.put(c.getId(), c.getRubroId()));
+		}
 		return lineas.stream()
 				.filter(linea -> cupon.aplicaATodaLaTienda()
 						|| cupon.getProductos().contains(linea.productoId())

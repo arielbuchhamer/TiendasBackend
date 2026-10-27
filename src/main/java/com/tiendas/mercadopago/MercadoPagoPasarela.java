@@ -134,8 +134,7 @@ public class MercadoPagoPasarela implements PasarelaPago {
 			// MP solo acepta cantidades enteras: si la cantidad tiene decimales (ej. 2,5 m²) se envía una
 			// unidad con el subtotal, aclarando la cantidad en el título
 			boolean cantidadEntera = item.getCantidad().stripTrailingZeros().scale() <= 0;
-			String titulo = item.getProductoNombre()
-					+ (item.getVarianteDescripcion() == null ? "" : " (" + item.getVarianteDescripcion() + ")")
+			String titulo = item.titulo()
 					+ (cantidadEntera ? "" : " x " + item.getCantidad().stripTrailingZeros().toPlainString() + " "
 							+ item.getUnidadVenta().simbolo());
 			items.add(PreferenceItemRequest.builder()

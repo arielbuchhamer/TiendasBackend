@@ -118,7 +118,7 @@ public class ProductoService {
 	}
 
 	private void copiarDatos(Producto datos, Producto producto) {
-		if (!categoriaRepository.existsById(datos.getCategoriaId())) {
+		if (datos.getCategoriaId() != null && !categoriaRepository.existsById(datos.getCategoriaId())) {
 			throw new ReglaNegocioException("La categoría " + datos.getCategoriaId() + " no existe");
 		}
 		validarImagenes(datos);
@@ -129,6 +129,7 @@ public class ProductoService {
 		producto.setUnidadVenta(datos.getUnidadVenta());
 		producto.setActivo(datos.isActivo());
 		producto.setDestacado(datos.isDestacado());
+		producto.setServicio(datos.isServicio());
 		producto.setMedidas(Medidas.copiar(datos.getMedidas()));
 		producto.getImagenes().clear();
 		producto.getImagenes().addAll(datos.getImagenes());

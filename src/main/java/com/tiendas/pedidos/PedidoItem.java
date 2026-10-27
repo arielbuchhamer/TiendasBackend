@@ -21,6 +21,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -71,9 +72,30 @@ public class PedidoItem {
 	@JsonProperty(access = Access.READ_ONLY)
 	private UUID imagenId;
 
+	/** Si el cliente pidió personalizar el producto (ej. grabado). Su precio va incluido en el precio unitario. */
+	private boolean personalizado;
+
+	/** Lo que el cliente quiere (ej. el nombre a grabar). Opcional: también se puede coordinar después. */
+	@Size(max = 300)
+	private String personalizacionDetalle;
+
+	@JsonProperty(access = Access.READ_ONLY)
+	private String personalizacionNombre;
+
+	@JsonProperty(access = Access.READ_ONLY)
+	private BigDecimal personalizacionPrecio;
+
+	/** Precio del producto más el de la personalización, si la tiene. */
 	@JsonProperty(access = Access.READ_ONLY)
 	private BigDecimal precioUnitario;
 
 	@JsonProperty(access = Access.READ_ONLY)
 	private BigDecimal subtotal;
+
+	/** Nombre con la variante y la personalización (ej. "Mate (Rojo) + Grabado"), para Mercado Pago y los emails. */
+	public String titulo() {
+		return productoNombre
+				+ (varianteDescripcion == null || varianteDescripcion.isBlank() ? "" : " (" + varianteDescripcion + ")")
+				+ (personalizado ? " + " + personalizacionNombre : "");
+	}
 }

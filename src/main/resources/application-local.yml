@@ -19,6 +19,9 @@ descuentos:
 envios:
   habilitada: ${ENVIOS_HABILITADA:true}
 
+personalizacion:
+  habilitada: ${PERSONALIZACION_HABILITADA:true}
+
 # Correo Argentino simulado: cotiza con precios inventados sin credenciales. Para probar con la API de TEST:
 # CORREO_ARGENTINO_SIMULADO=false + CORREO_ARGENTINO_URL de test + credenciales en .env
 correo-argentino:

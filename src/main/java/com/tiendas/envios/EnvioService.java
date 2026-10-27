@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -301,9 +302,12 @@ public class EnvioService {
 			return Optional.ofNullable(porDefecto).map(m -> List.of(new CorreoArgentino.Paquete(1, m.getPesoGramos(),
 					m.getLargoCm(), m.getAnchoCm(), m.getAltoCm())));
 		}
-		List<Variante> variantes = varianteRepository.buscarConProducto(cantidades.keySet());
-		Map<Long, Medidas> porCategoria = categoriaRepository.findAllById(
-				variantes.stream().map(v -> v.getProducto().getCategoriaId()).collect(Collectors.toSet())).stream()
+		// Los servicios no viajan: no suman bultos
+		List<Variante> variantes = varianteRepository.buscarConProducto(cantidades.keySet()).stream()
+				.filter(v -> !v.getProducto().isServicio())
+				.toList();
+		Map<Long, Medidas> porCategoria = categoriaRepository.findAllById(variantes.stream()
+				.map(v -> v.getProducto().getCategoriaId()).filter(Objects::nonNull).collect(Collectors.toSet())).stream()
 				.filter(c -> completas(c.getMedidas()))
 				.collect(Collectors.toMap(Categoria::getId, Categoria::getMedidas));
 		List<CorreoArgentino.Paquete> paquetes = new ArrayList<>();

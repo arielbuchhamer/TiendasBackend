@@ -137,6 +137,9 @@ descuentos:
 envios:
   habilitada: ${ENVIOS_HABILITADA:false}
 
+personalizacion:
+  habilitada: ${PERSONALIZACION_HABILITADA:false}
+
 correo-argentino:
   habilitada: ${CORREO_ARGENTINO_HABILITADA:false}
   url: ${CORREO_ARGENTINO_URL:https://api.correoargentino.com.ar/micorreo/v1}

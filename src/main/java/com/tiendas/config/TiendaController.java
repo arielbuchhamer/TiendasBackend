@@ -8,6 +8,7 @@ import com.tiendas.descuentos.DescuentosProperties;
 import com.tiendas.emails.EmailProperties;
 import com.tiendas.envios.EnviosProperties;
 import com.tiendas.facturacion.FacturacionProperties;
+import com.tiendas.personalizacion.PersonalizacionProperties;
 import com.tiendas.zipnova.ZipnovaProperties;
 
 /**
@@ -25,18 +26,18 @@ class TiendaController {
 	 * el panel nunca muestra una sección cuyos endpoints no existen (ni al revés).
 	 */
 	record Modulos(boolean facturacion, boolean descuentos, boolean envios, boolean correoArgentino, boolean email,
-			boolean zipnova) {
+			boolean zipnova, boolean personalizacion) {
 	}
 
 	private final InfoTienda info;
 
 	TiendaController(TiendaProperties tienda, FacturacionProperties facturacion, DescuentosProperties descuentos,
 			EnviosProperties envios, CorreoArgentinoProperties correo, EmailProperties email,
-			ZipnovaProperties zipnova) {
+			ZipnovaProperties zipnova, PersonalizacionProperties personalizacion) {
 		this.info = new InfoTienda(tienda.nombre(), tienda.moneda(), tienda.envio(),
 				new Modulos(facturacion.habilitada(), descuentos.habilitada(), envios.habilitada(),
 						envios.habilitada() && correo.habilitada(), email.habilitada(),
-						envios.habilitada() && zipnova.habilitada()));
+						envios.habilitada() && zipnova.habilitada(), personalizacion.habilitada()));
 	}
 
 	@GetMapping("/api/v1/tienda")

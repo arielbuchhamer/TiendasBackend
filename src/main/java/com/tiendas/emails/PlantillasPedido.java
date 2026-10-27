@@ -205,9 +205,9 @@ class PlantillasPedido {
 	}
 
 	private static String descripcion(PedidoItem item) {
-		return StringUtils.hasText(item.getVarianteDescripcion())
-				? item.getProductoNombre() + " (" + item.getVarianteDescripcion() + ")"
-				: item.getProductoNombre();
+		return StringUtils.hasText(item.getPersonalizacionDetalle())
+				? item.titulo() + ": \"" + item.getPersonalizacionDetalle() + "\""
+				: item.titulo();
 	}
 
 	private static String cantidad(PedidoItem item) {
