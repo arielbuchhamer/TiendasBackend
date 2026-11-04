@@ -61,9 +61,10 @@ Paquetes **por funcionalidad** (no por capa técnica), en `src/main/java/com/tie
 | `descuentos` | Cupones (códigos de descuento) y su cálculo en el checkout; módulo opcional (`descuentos.habilitada`) |
 | `envios` | Zonas de envío por código postal, retiro y envío gratis desde un monto; módulo opcional (`envios.habilitada`) |
 | `correo` | Correo Argentino (API MiCorreo): cotización, sucursales, alta de envíos y seguimiento; opcional (`correo-argentino.habilitada`) |
-| `emails` | Emails de pedidos vía Resend; cola `email_pendiente` (outbox) con reintentos; `email.habilitada=true` (`@EmailHabilitado`) |
+| `emails` | Emails de pedidos y de cuentas de cliente vía Resend; cola `email_pendiente` (outbox) con reintentos; `email.habilitada=true` (`@EmailHabilitado`) |
 | `zipnova` | Zipnova (API de envíos v2, varios transportes): cotización, sucursales, alta, etiqueta y seguimiento; opcional (`zipnova.habilitada`) |
 | `personalizacion` | Personalización de productos (ej. grabado) con precio único editable en el panel; opcional (`personalizacion.habilitada`) |
+| `clientes` | Cuentas de cliente: alta en el panel, invitación por email, login, mis pedidos y checkout con sesión; opcional (`clientes.habilitada`) |
 | `desarrollo` | Solo perfil `local`: `DatosEjemplo` (catálogo HA!Tablas) y `PasarelaSimulada` (pagos sin MP) |
 
 Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (reglas y transacciones) →
@@ -103,11 +104,13 @@ Capas dentro de cada paquete: `Controller` (HTTP, sin lógica) → `Service` (re
 
 ### Seguridad
 
-- Lista blanca de rutas en `SecurityConfig`; todo lo no declarado se deniega. `/api/v1/admin/**` requiere `ADMIN`.
+- Lista blanca de rutas en `SecurityConfig`; todo lo no declarado se deniega. `/api/v1/admin/**` requiere `ADMIN` y
+  `/api/v1/clientes/yo/**`, `CLIENTE` (módulo de clientes).
   Al agregar un endpoint público, declararlo explícitamente ahí.
 - Sesión por cookie HttpOnly (`SESION`), CSRF con cookie `XSRF-TOKEN` + header `X-XSRF-TOKEN` (excepto checkout,
-  `checkout/cupon` y webhook: son anónimos).
-- Login: BCrypt(12), cambio de id de sesión, límite de intentos por usuario e IP.
+  `checkout/cupon` y webhook: son anónimos; el checkout con sesión de cliente sí lleva CSRF).
+- Login: BCrypt(12), cambio de id de sesión (`InicioSesion`, compartido por el login de admin y el de clientes),
+  límite de intentos por usuario e IP.
 - Webhook de MP: firma HMAC obligatoria + consulta del pago a la API de MP (nunca confiar en el body).
 - Errores: nunca exponer mensajes internos; `ReglaNegocioException` (422) para mensajes pensados para el usuario.
 - **Secretos solo en variables de entorno.** Nada de tokens, contraseñas, CUITs ni datos de clientes en el código,
@@ -135,9 +138,10 @@ En el `.env` local los acentos van escapados (`\u00e9`): Spring lee ese archivo 
 
 ### Módulos opcionales
 
-Una funcionalidad opcional (hoy: facturación, descuentos, envíos, Correo Argentino, Zipnova, emails y personalización) se activa por
-instancia con una sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`, `ENVIOS_HABILITADA`,
-`CORREO_ARGENTINO_HABILITADA`, `ZIPNOVA_HABILITADA`, `EMAIL_HABILITADA`, `PERSONALIZACION_HABILITADA`). Esa misma propiedad:
+Una funcionalidad opcional (hoy: facturación, descuentos, envíos, Correo Argentino, Zipnova, emails, personalización y
+cuentas de cliente) se activa por instancia con una sola propiedad (`FACTURACION_HABILITADA`, `DESCUENTOS_HABILITADA`,
+`ENVIOS_HABILITADA`, `CORREO_ARGENTINO_HABILITADA`, `ZIPNOVA_HABILITADA`, `EMAIL_HABILITADA`,
+`PERSONALIZACION_HABILITADA`, `CLIENTES_HABILITADA`). Esa misma propiedad:
 1. crea o no los beans y endpoints del módulo (anotación condicional, ej. `@FacturacionHabilitada`), y
 2. se informa al frontend en `GET /api/v1/tienda` → `modulos`, para que el panel muestre u oculte la sección.
 
@@ -235,6 +239,34 @@ aparte del producto), pero es genérico: cualquier tienda puede ofrecer un adici
   arregla con el cliente cómo le llegan las piezas).
 - **Categoría opcional**: `producto.categoria_id` admite NULL (V10) para que un servicio no aparezca en ningún rubro.
   Todo lo que agrupa por categoría (cupones por rubro, medidas por categoría) tiene que tolerar el null.
+
+### Cuentas de cliente
+
+Paquete `clientes` (módulo opcional, requiere el de emails: sin él la app no arranca). Con el módulo apagado no existe
+ningún bean del paquete, el checkout es anónimo como siempre y las tablas quedan vacías.
+
+- **Alta**: no hay registro público. El administrador crea al cliente en el panel (`/api/v1/admin/clientes`), que queda
+  `PENDIENTE` y sin contraseña, y le manda la invitación (`POST …/{id}/invitacion`). Estados (`EstadoCliente`):
+  `PENDIENTE`, `ACTIVO`, `BLOQUEADO`; reactivar a quien no eligió contraseña lo deja `PENDIENTE`. Un cliente con
+  pedidos no se borra, se bloquea. El email se guarda en minúsculas (`Textos.minusculas`) y es único.
+- **Links** (`TokensCliente`, tabla `cliente_token`): activación (`CLIENTES_HORAS_INVITACION`) y cambio de contraseña
+  (`CLIENTES_MINUTOS_RESETEO`), de un solo uso (UPDATE condicional) y con vencimiento; solo vale el último de cada
+  tipo. Se guarda el SHA-256: el token en claro solo viaja en el email. Inexistente, usado o vencido dan el mismo 404.
+  `LimpiezaTokens` borra los vencidos hace más de 30 días.
+- **Emails**: `ClienteService`/`CuentaClienteService` publican `InvitacionCliente` y `ReseteoClaveCliente` dentro de
+  la transacción; `EmailsCliente` (paquete `emails`) los encola con `PlantillasCliente` (diseño de `DisenoEmail`).
+- **Login** (`AutenticacionClientes`): misma cadena de filtros, misma cookie y mismo CSRF que el panel, rol `CLIENTE`
+  (`Cliente.ROL`). Tiene su propio `AuthenticationManager` que **no es bean**: el de administradores sigue siendo el
+  único del contexto. El nombre de la sesión es el **id** del cliente (no cambia si el admin edita el email). Pendiente,
+  bloqueado, inexistente y contraseña incorrecta dan el mismo 401 (y el mismo tiempo de respuesta). Límites propios
+  (`LimitadorIntentosCliente`), independientes de los del admin. `GET /auth/yo` da 401 a una sesión de cliente.
+- **Sesión**: `/api/v1/clientes/yo/**` (`MiCuentaController`) relee la cuenta en cada request
+  (`CuentaClienteService#activo`): bloquear a un cliente corta su sesión abierta. Los datos los edita solo el admin.
+- **Checkout**: con el módulo activo se compra en `POST /api/v1/clientes/yo/checkout` (con CSRF) y `POST /checkout`
+  responde 401. `CheckoutService#iniciarConCuenta` copia los datos de la cuenta en `pedido.cliente` (ignora los del
+  body) y guarda `pedido.clienteId`. El `@NotNull` de `Pedido.cliente` está en el grupo `CheckoutAnonimo`, que solo
+  valida `POST /checkout`. Los "usos por cliente" de los cupones siguen yendo por el email (el de la cuenta).
+- Pendiente: probar los emails de invitación y cambio de contraseña con Resend real.
 
 ### Correo Argentino (API MiCorreo)
 
@@ -360,6 +392,10 @@ El código existente **no se refactoriza solo por esto** (decisión del dueño, 
   decimales?" en `UnidadVenta`, "¿medidas completas?" en `Medidas`); si es transversal, una clase chica en `comun`
   (ej. redondeo de montos, texto opcional `trim`/`null`, códigos en mayúsculas). No crear clases `Utils` genéricas
   ni capas nuevas (ver "Arquitectura").
+- Lo que ya está extraído (usarlo en vez de reescribirlo): en `comun`, `Textos` (minúsculas, texto opcional),
+  `Consultas` (búsqueda LIKE escapada, orden con lista blanca y desempate), `ContadorIntentos` (límite con ventana),
+  `NoAutenticadoException` (401) y `DemasiadosIntentosException` (429); en `config`, `InicioSesion`; en `emails`,
+  `DisenoEmail` (marco común de los emails) y `ContenidoEmail`.
 - Anotaciones repetidas con los mismos parámetros se agrupan en una meta-anotación (como `@FacturacionHabilitada`).
 - Un módulo nuevo copia la forma de los existentes: record `*Properties`, anotación condicional, `Controller` →
   `Service` → `Repository`, campo en `TiendaController.Modulos`.
@@ -397,13 +433,14 @@ El código existente **no se refactoriza solo por esto** (decisión del dueño, 
   confirmar que no hay consultas repetidas.
 
 ### Deuda conocida (corregir cuando se toque esa parte)
-- `CuponService#aplicar` lanza `ResponseStatusException` (429): pasar a una excepción del proyecto manejada en
-  `ManejadorErrores` (lo mismo `AuthController` con 401/429, si se generaliza).
+- `CuponService#aplicar` lanza `ResponseStatusException` (429): pasar a `DemasiadosIntentosException` (ya existe y la
+  maneja `ManejadorErrores`); lo mismo `AuthController` con 401/429 (`NoAutenticadoException`).
 - `CuponService#obtener` trae las métricas de todos los cupones para usar una: consulta por id.
 - Checkout y cotización consultan las variantes dos veces (`CheckoutService` y `EnvioService#paquetes`) y
   `EnvioService` lee los ajustes varias veces por request.
 - "¿Tiene decimales?" repetido en `ProductoService`, `CheckoutService` y `MercadoPagoPasarela`; `completas(Medidas)`
   vive en `EnvioService`; redondeo `setScale(2, HALF_UP)` y "texto opcional" repetidos en varios services.
+- "Texto opcional" repetido en services viejos: pasarlos a `Textos.opcional` cuando se toquen.
 - Eliminar con `flush` + `ConflictoException` repetido en `RubroService`, `CategoriaService` y `ProductoService`.
 
 ## Git y versionado

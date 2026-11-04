@@ -28,6 +28,9 @@ Nació a partir de `BackTecnophones` (MongoDB), conservando su historial de Git 
 - **Facturación electrónica ARCA** (opcional, por tienda) vía AFRelay: Factura/Nota A, B, C, PDF con logo y color de marca.
 - **Emails** (opcional, por tienda) vía Resend: confirmación de compra al cliente y aviso de venta al administrador
   cuando se aprueba el pago. Cola en la base con reintentos: si Resend falla, el email se reintenta y no se pierde.
+- **Cuentas de cliente** (opcional, por tienda; requiere emails): el administrador da de alta a los clientes y los
+  invita por email a elegir su contraseña. Con el módulo activo, para comprar hace falta iniciar sesión y el pedido
+  toma los datos del comprador de la cuenta. Cada cliente ve sus pedidos.
 
 ## Stack
 
@@ -133,14 +136,25 @@ Listados paginados: `?page=0&size=24&sort=precio,asc` → `{ "content": [...], "
 | `POST /checkout` | Crea el pedido y devuelve `checkoutUrl` de Mercado Pago |
 | `POST /webhooks/mercadopago` | Notificaciones de Mercado Pago (firmadas) |
 | `GET /comprobantes/{codigo}/pdf` | PDF de factura (si la facturación está habilitada) |
-| `POST /auth/login`, `POST /auth/logout`, `GET /auth/yo` | Sesión del panel |
+| `POST /auth/login`, `POST /auth/logout`, `GET /auth/yo` | Sesión del panel (`/auth/yo` da 401 a una sesión de cliente) |
+
+| Cuentas de cliente (solo con `CLIENTES_HABILITADA=true`) | |
+|---|---|
+| `POST /clientes/login` `{ email, clave }` | Inicia la sesión del cliente (misma cookie; el logout es `POST /auth/logout`). 401 genérico, 429 tras varios fallos |
+| `GET /clientes/activacion/{token}`, `POST /clientes/activacion` `{ token, clave }` | Datos para el saludo / elige la primera contraseña (404 si el link no sirve) |
+| `POST /clientes/olvide-clave` `{ email }` | Manda el link para cambiar la contraseña; siempre 204 |
+| `GET /clientes/reseteo/{token}`, `POST /clientes/reseteo` `{ token, clave }` | Igual que la activación, para una contraseña nueva |
+| `GET /clientes/yo`, `PUT /clientes/yo/clave` `{ claveActual, claveNueva }` | Cuenta del cliente con sesión |
+| `POST /clientes/yo/checkout` | Checkout con sesión: mismo body que `POST /checkout` sin `cliente` |
+| `GET /clientes/yo/pedidos`, `GET /clientes/yo/pedidos/{codigo}` | Pedidos del cliente |
 
 | Panel (`/admin/**`, rol ADMIN) | |
 |---|---|
 | `rubros`, `categorias`, `productos` | ABM del catálogo (`GET` de productos incluye inactivos) |
 | `POST /admin/imagenes` | Subida multipart (`archivos`, hasta 10) |
-| `GET /admin/pedidos?estado=`, `GET /admin/pedidos/{id}`, `PATCH /admin/pedidos/{id}/visto`, `GET /admin/pedidos/no-vistos` | Pedidos |
+| `GET /admin/pedidos?estado=&clienteId=`, `GET /admin/pedidos/{id}`, `PATCH /admin/pedidos/{id}/visto`, `GET /admin/pedidos/no-vistos` | Pedidos |
 | `usuarios` | ABM de administradores |
+| `clientes?estado=&texto=`, `POST clientes/{id}/invitacion`, `PATCH clientes/{id}/estado` | Cuentas de cliente (módulo de clientes) |
 | `comprobantes`, `comprobantes/manual`, `facturacion/*` | Facturación ARCA |
 
 ### Para el frontend
@@ -154,6 +168,11 @@ Listados paginados: `?page=0&size=24&sort=precio,asc` → `{ "content": [...], "
 - Imágenes: `${API}/api/v1/imagenes/${id}/tarjeta`.
 - Panel: mostrar u ocultar las secciones opcionales según `GET /tienda` → `modulos` (ej. la tarjeta de
   Facturación solo si `modulos.facturacion` es `true`). Se controla por instancia con `FACTURACION_HABILITADA`.
+- Cuentas de cliente (`modulos.clientes`): no hay registro público. El checkout es `POST /clientes/yo/checkout` (con
+  sesión y con `X-XSRF-TOKEN`); `POST /checkout` responde 401. Los links del email llegan a
+  `${TIENDA_FRONTEND_URL}/account/activate/{token}` y `/account/reset/{token}` (configurables con
+  `CLIENTES_RUTA_ACTIVACION` y `CLIENTES_RUTA_RESETEO`): el front pide la contraseña (10 a 72 caracteres) y la manda
+  con el token. Una sesión de cliente bloqueado responde 401.
 - Mercado Pago vuelve a `${TIENDA_FRONTEND_URL}/exito|pendiente|fallo` (configurable con `MERCADOPAGO_RUTA_EXITO`, etc.) con `external_reference` = código del pedido.
 
 ## Versionado y ramas
