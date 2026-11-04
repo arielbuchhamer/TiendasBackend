@@ -1,5 +1,10 @@
 package com.tiendas.emails;
 
+import static com.tiendas.emails.DisenoEmail.esc;
+import static com.tiendas.emails.DisenoEmail.parrafo;
+import static com.tiendas.emails.DisenoEmail.seccion;
+import static com.tiendas.emails.DisenoEmail.subtitulo;
+
 import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -9,7 +14,6 @@ import java.util.Locale;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.springframework.web.util.HtmlUtils;
 
 import com.tiendas.config.TiendaProperties;
 import com.tiendas.pedidos.DatosCliente;
@@ -34,6 +38,7 @@ class PlantillasPedido {
 	}
 
 	private static final Locale LOCALE = Locale.forLanguageTag("es-AR");
+	private static final String NO_FUE_USTED = "Si no hiciste esta compra, ignorá este email.";
 
 	private final TiendaProperties tienda;
 
@@ -84,12 +89,7 @@ class PlantillasPedido {
 		List<String> entrega = entrega(pedido);
 		List<Total> totales = totales(pedido);
 
-		StringBuilder html = new StringBuilder()
-				.append("<!doctype html><html><body style=\"margin:0;padding:24px;background:#f4f4f5;")
-				.append("font-family:Arial,Helvetica,sans-serif;color:#18181b\">")
-				.append("<div style=\"max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:28px\">")
-				.append("<h1 style=\"margin:0 0 12px;font-size:22px;line-height:1.3\">").append(esc(partes.titulo()))
-				.append("</h1>");
+		StringBuilder html = new StringBuilder(DisenoEmail.abrir(partes.titulo()));
 		partes.intro().forEach(linea -> html.append(parrafo(linea)));
 		if (!partes.datos().isEmpty()) {
 			html.append(seccion(partes.tituloDatos(), partes.datos()));
@@ -110,16 +110,13 @@ class PlantillasPedido {
 				.append("<div style=\"margin-top:20px\">");
 		partes.cierre().forEach(linea -> html.append(parrafo(linea)));
 		if (partes.firma()) {
-			html.append("<p style=\"margin:16px 0 0;font-size:14px\">Saludos,<br>").append(esc(tienda.nombre()))
-					.append("</p>");
+			html.append(DisenoEmail.firma(tienda.nombre()));
 		}
-		html.append("</div><p style=\"margin:24px 0 0;padding-top:16px;border-top:1px solid #e4e4e7;font-size:12px;")
-				.append("color:#71717a\"><a href=\"").append(esc(tienda.frontendUrl())).append("\" style=\"color:#71717a\">")
-				.append(esc(tienda.frontendUrl())).append("</a><br>Código de pedido: ").append(pedido.getCodigo());
+		List<String> pie = new ArrayList<>(List.of("Código de pedido: " + pedido.getCodigo()));
 		if (partes.firma()) {
-			html.append("<br>Si no hiciste esta compra, ignorá este email.");
+			pie.add(NO_FUE_USTED);
 		}
-		html.append("</p></div></body></html>");
+		html.append("</div>").append(DisenoEmail.cerrar(tienda.frontendUrl(), pie));
 
 		StringBuilder texto = new StringBuilder(partes.titulo()).append("\n\n");
 		partes.intro().forEach(linea -> texto.append(linea).append("\n"));
@@ -145,7 +142,7 @@ class PlantillasPedido {
 		texto.append("\n").append(tienda.frontendUrl()).append("\nCódigo de pedido: ").append(pedido.getCodigo())
 				.append("\n");
 		if (partes.firma()) {
-			texto.append("Si no hiciste esta compra, ignorá este email.\n");
+			texto.append(NO_FUE_USTED).append("\n");
 		}
 		return new Contenido(asunto, html.toString(), texto.toString());
 	}
@@ -227,27 +224,5 @@ class PlantillasPedido {
 		String peso = total.destacado() ? "font-weight:bold;font-size:16px;" : "";
 		return "<tr><td style=\"padding:6px 0;" + peso + "\">" + esc(total.etiqueta()) + "</td><td style=\"padding:6px 0;"
 				+ "text-align:right;white-space:nowrap;" + peso + "\">" + esc(total.valor()) + "</td></tr>";
-	}
-
-	private static String subtitulo(String texto) {
-		return "<h2 style=\"margin:24px 0 8px;font-size:15px\">" + esc(texto) + "</h2>";
-	}
-
-	/** Bloque con título opcional y una línea por dato (datos del cliente, entrega). */
-	private static String seccion(String titulo, List<String> lineas) {
-		StringBuilder html = new StringBuilder(titulo == null ? "" : subtitulo(titulo))
-				.append("<p style=\"margin:0 0 8px;font-size:14px;line-height:1.6\">");
-		for (int i = 0; i < lineas.size(); i++) {
-			html.append(i == 0 ? "" : "<br>").append(esc(lineas.get(i)));
-		}
-		return html.append("</p>").toString();
-	}
-
-	private static String parrafo(String texto) {
-		return "<p style=\"margin:0 0 8px;font-size:14px\">" + esc(texto) + "</p>";
-	}
-
-	private static String esc(String texto) {
-		return HtmlUtils.htmlEscape(texto, "UTF-8");
 	}
 }
