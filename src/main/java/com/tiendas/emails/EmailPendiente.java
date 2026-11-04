@@ -23,6 +23,9 @@ class EmailPendiente extends EntidadBase {
 
 	private Long pedidoId;
 
+	/** Cuenta a la que se refiere el email (invitación, cambio de contraseña). */
+	private Long clienteId;
+
 	/** Direcciones separadas por coma. */
 	@Column(nullable = false)
 	private String destinatarios;

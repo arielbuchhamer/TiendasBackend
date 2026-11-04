@@ -142,6 +142,10 @@ public class Pedido extends EntidadBase {
 	@JsonProperty(access = Access.READ_ONLY)
 	private Long cuponId;
 
+	/** Cuenta de cliente que hizo el pedido; null en el checkout anónimo (módulo de clientes apagado). */
+	@JsonProperty(access = Access.READ_ONLY)
+	private Long clienteId;
+
 	/** Descuento del cupón, ya restado del total. */
 	@JsonProperty(access = Access.READ_ONLY)
 	@Column(nullable = false)
