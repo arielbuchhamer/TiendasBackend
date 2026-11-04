@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.tiendas.comun.NoAutenticadoException;
 import com.tiendas.comun.NoEncontradoException;
+import com.tiendas.comun.ReglaNegocioException;
 
 /**
  * Lo que hace el propio cliente con su cuenta: activarla, recuperar la contraseña y consultar sus datos.
@@ -53,6 +54,15 @@ class CuentaClienteService {
 		return clienteRepository.findById(clienteId)
 				.filter(Cliente::estaActivo)
 				.orElseThrow(() -> new NoAutenticadoException("Tu sesión ya no es válida. Iniciá sesión de nuevo."));
+	}
+
+	@Transactional
+	void cambiarClave(Long clienteId, String actual, String nueva) {
+		Cliente cliente = activo(clienteId);
+		if (!passwordEncoder.matches(actual, cliente.getPasswordHash())) {
+			throw new ReglaNegocioException("La contraseña actual no es correcta");
+		}
+		cliente.setPasswordHash(passwordEncoder.encode(nueva));
 	}
 
 	// ─── Activación (primera contraseña) ────────────────────────────────

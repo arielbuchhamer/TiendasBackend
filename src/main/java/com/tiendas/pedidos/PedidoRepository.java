@@ -23,6 +23,8 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
 	boolean existsByClienteId(Long clienteId);
 
+	Optional<Pedido> findByCodigoAndClienteId(UUID codigo, Long clienteId);
+
 	long countByEstadoAndVistoFalse(EstadoPedido estado);
 
 	java.util.Optional<Pedido> findByEnvioExternoId(String envioExternoId);

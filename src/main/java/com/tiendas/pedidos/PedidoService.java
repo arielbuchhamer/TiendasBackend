@@ -74,6 +74,23 @@ public class PedidoService {
 		return inicializar(pedidoRepository.findById(id).orElseThrow(() -> NoEncontradoException.de("Pedido", id)));
 	}
 
+	// ─── Cuenta del cliente (módulo de clientes) ────────────────────────
+
+	/** Pedidos de una cuenta de cliente, más nuevos primero. */
+	public Page<Pedido> listarDeCliente(Long clienteId, Pageable pagina) {
+		Pageable recientesPrimero = PageRequest.of(pagina.getPageNumber(), pagina.getPageSize(),
+				Sort.by(Sort.Direction.DESC, "creadoEn").and(Sort.by(Sort.Direction.DESC, "id")));
+		Page<Pedido> pedidos = pedidoRepository.findByClienteId(clienteId, recientesPrimero);
+		pedidos.forEach(PedidoService::inicializar);
+		return pedidos;
+	}
+
+	/** Busca por código y cliente a la vez: un cliente no puede ver el pedido de otro aunque conozca el código. */
+	public Pedido obtenerDeCliente(UUID codigo, Long clienteId) {
+		return inicializar(pedidoRepository.findByCodigoAndClienteId(codigo, clienteId)
+				.orElseThrow(() -> new NoEncontradoException("Pedido no encontrado")));
+	}
+
 	public long contarAprobadosNoVistos() {
 		return pedidoRepository.countByEstadoAndVistoFalse(EstadoPedido.APROBADO);
 	}
