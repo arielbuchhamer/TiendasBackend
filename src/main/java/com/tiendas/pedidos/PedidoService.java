@@ -52,12 +52,20 @@ public class PedidoService {
 
 	// ─── Panel de administración ────────────────────────────────────────
 
-	public Page<Pedido> listar(EstadoPedido estado, Pageable pagina) {
+	/** @param clienteId opcional: solo los pedidos de esa cuenta de cliente */
+	public Page<Pedido> listar(EstadoPedido estado, Long clienteId, Pageable pagina) {
 		Pageable recientesPrimero = PageRequest.of(pagina.getPageNumber(), pagina.getPageSize(),
 				Sort.by(Sort.Direction.DESC, "creadoEn"));
-		Page<Pedido> pedidos = estado == null
-				? pedidoRepository.findAll(recientesPrimero)
-				: pedidoRepository.findByEstado(estado, recientesPrimero);
+		Page<Pedido> pedidos;
+		if (clienteId != null) {
+			pedidos = estado == null
+					? pedidoRepository.findByClienteId(clienteId, recientesPrimero)
+					: pedidoRepository.findByEstadoAndClienteId(estado, clienteId, recientesPrimero);
+		} else {
+			pedidos = estado == null
+					? pedidoRepository.findAll(recientesPrimero)
+					: pedidoRepository.findByEstado(estado, recientesPrimero);
+		}
 		pedidos.forEach(PedidoService::inicializar);
 		return pedidos;
 	}

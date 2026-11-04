@@ -17,6 +17,12 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
 	Page<Pedido> findByEstado(EstadoPedido estado, Pageable pagina);
 
+	Page<Pedido> findByClienteId(Long clienteId, Pageable pagina);
+
+	Page<Pedido> findByEstadoAndClienteId(EstadoPedido estado, Long clienteId, Pageable pagina);
+
+	boolean existsByClienteId(Long clienteId);
+
 	long countByEstadoAndVistoFalse(EstadoPedido estado);
 
 	java.util.Optional<Pedido> findByEnvioExternoId(String envioExternoId);

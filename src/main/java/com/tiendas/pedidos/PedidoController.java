@@ -74,8 +74,8 @@ public class PedidoController {
 
 	@GetMapping("/admin/pedidos")
 	public Page<Pedido> listar(@RequestParam(required = false) EstadoPedido estado,
-			@PageableDefault(size = 20) Pageable pagina) {
-		return pedidoService.listar(estado, pagina);
+			@RequestParam(required = false) Long clienteId, @PageableDefault(size = 20) Pageable pagina) {
+		return pedidoService.listar(estado, clienteId, pagina);
 	}
 
 	@GetMapping("/admin/pedidos/no-vistos")
