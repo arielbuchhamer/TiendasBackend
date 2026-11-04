@@ -6,10 +6,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.SecurityContextRepository;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.tiendas.config.InicioSesion;
 import com.tiendas.config.IpCliente;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,18 +32,15 @@ public class AuthController {
 	}
 
 	private final AuthenticationManager authenticationManager;
-	private final SecurityContextRepository securityContextRepository;
-	private final CookieCsrfTokenRepository csrfTokenRepository;
+	private final InicioSesion inicioSesion;
 	private final LimitadorIntentosLogin limitador;
 	private final UsuarioService usuarioService;
 	private final IpCliente ipCliente;
 
-	public AuthController(AuthenticationManager authenticationManager, SecurityContextRepository securityContextRepository,
-			CookieCsrfTokenRepository csrfTokenRepository, LimitadorIntentosLogin limitador, UsuarioService usuarioService,
-			IpCliente ipCliente) {
+	public AuthController(AuthenticationManager authenticationManager, InicioSesion inicioSesion,
+			LimitadorIntentosLogin limitador, UsuarioService usuarioService, IpCliente ipCliente) {
 		this.authenticationManager = authenticationManager;
-		this.securityContextRepository = securityContextRepository;
-		this.csrfTokenRepository = csrfTokenRepository;
+		this.inicioSesion = inicioSesion;
 		this.limitador = limitador;
 		this.usuarioService = usuarioService;
 		this.ipCliente = ipCliente;
@@ -70,15 +64,7 @@ public class AuthController {
 		}
 		limitador.registrarExito(login.username());
 
-		// Nuevo id de sesión y nuevo token CSRF al autenticarse (evita session fixation)
-		if (request.getSession(false) != null) {
-			request.changeSessionId();
-		}
-		SecurityContext contexto = SecurityContextHolder.createEmptyContext();
-		contexto.setAuthentication(autenticacion);
-		SecurityContextHolder.setContext(contexto);
-		securityContextRepository.saveContext(contexto, request, response);
-		csrfTokenRepository.saveToken(csrfTokenRepository.generateToken(request), request, response);
+		inicioSesion.iniciar(autenticacion, request, response);
 
 		return usuarioService.obtenerPorUsername(autenticacion.getName());
 	}
