@@ -43,6 +43,16 @@ public class ManejadorErrores extends ResponseEntityExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
 	}
 
+	@ExceptionHandler(NoAutenticadoException.class)
+	ProblemDetail noAutenticado(NoAutenticadoException e) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+	}
+
+	@ExceptionHandler(DemasiadosIntentosException.class)
+	ProblemDetail demasiadosIntentos(DemasiadosIntentosException e) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+	}
+
 	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
 	ProblemDetail modificacionConcurrente(ObjectOptimisticLockingFailureException e) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,

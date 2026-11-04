@@ -1,7 +1,6 @@
 package com.tiendas.usuarios;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -30,6 +29,8 @@ public class AuthController {
 
 	public record LoginRequest(@NotBlank String username, @NotBlank String password) {
 	}
+
+	private static final String ROL_ADMIN = "ROLE_" + Rol.ADMIN.name();
 
 	private final AuthenticationManager authenticationManager;
 	private final InicioSesion inicioSesion;
@@ -69,10 +70,14 @@ public class AuthController {
 		return usuarioService.obtenerPorUsername(autenticacion.getName());
 	}
 
-	/** Usuario de la sesión actual; 401 si no hay sesión. */
+	/**
+	 * Usuario de la sesión actual; 401 si no hay sesión de administrador. Una sesión de cliente (módulo de clientes)
+	 * también da 401: el panel la trata como "sin sesión" y manda al login de administrador.
+	 */
 	@GetMapping("/yo")
 	public Usuario yo(Authentication autenticacion) {
-		if (autenticacion == null || autenticacion instanceof AnonymousAuthenticationToken) {
+		if (autenticacion == null || autenticacion.getAuthorities().stream()
+				.noneMatch(permiso -> ROL_ADMIN.equals(permiso.getAuthority()))) {
 			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
 		}
 		return usuarioService.obtenerPorUsername(autenticacion.getName());

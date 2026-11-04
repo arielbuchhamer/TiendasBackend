@@ -27,6 +27,9 @@ import lombok.Setter;
 @Entity
 public class Cliente extends EntidadBase {
 
+	/** Rol de Spring Security de una sesión de cliente (las de administrador son {@code ADMIN}). */
+	public static final String ROL = "CLIENTE";
+
 	@NotBlank
 	@Email
 	@Size(max = 160)

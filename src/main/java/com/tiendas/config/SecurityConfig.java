@@ -31,10 +31,13 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.tiendas.clientes.Cliente;
+
 /**
  * Reglas de acceso:
  * <ul>
  * <li>{@code /api/v1/admin/**}: solo usuarios con rol ADMIN (sesión por cookie).</li>
+ * <li>{@code /api/v1/clientes/yo/**}: solo clientes con sesión (módulo de clientes; misma cookie, rol CLIENTE).</li>
  * <li>Lectura del catálogo, checkout, webhook y login: públicos.</li>
  * <li>Cualquier otra ruta: denegada (lista blanca explícita).</li>
  * </ul>
@@ -66,6 +69,7 @@ public class SecurityConfig {
 				.securityContext(contexto -> contexto.securityContextRepository(securityContextRepository))
 				.authorizeHttpRequests(rutas -> rutas
 						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+						.requestMatchers("/api/v1/clientes/yo", "/api/v1/clientes/yo/**").hasRole(Cliente.ROL)
 						.requestMatchers(GET,
 								"/api/v1/tienda",
 								"/api/v1/envios",
@@ -76,6 +80,10 @@ public class SecurityConfig {
 								"/api/v1/productos/**",
 								"/api/v1/imagenes/**",
 								"/api/v1/comprobantes/*/pdf").permitAll()
+						// Cuentas de cliente: sin el módulo, los controllers no existen y estas rutas dan 404
+						.requestMatchers(GET, "/api/v1/clientes/activacion/*", "/api/v1/clientes/reseteo/*").permitAll()
+						.requestMatchers(POST, "/api/v1/clientes/login", "/api/v1/clientes/activacion",
+								"/api/v1/clientes/olvide-clave", "/api/v1/clientes/reseteo").permitAll()
 						.requestMatchers(POST, "/api/v1/checkout", "/api/v1/checkout/cupon", "/api/v1/envios/cotizar",
 								"/api/v1/webhooks/mercadopago", "/api/v1/webhooks/zipnova/*").permitAll()
 						.requestMatchers("/api/v1/auth/**").permitAll()
