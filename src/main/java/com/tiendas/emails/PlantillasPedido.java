@@ -31,9 +31,6 @@ import com.tiendas.pedidos.TipoEntrega;
 @EmailHabilitado
 class PlantillasPedido {
 
-	record Contenido(String asunto, String html, String texto) {
-	}
-
 	private record Total(String etiqueta, String valor, boolean destacado) {
 	}
 
@@ -46,7 +43,7 @@ class PlantillasPedido {
 		this.tienda = tienda;
 	}
 
-	Contenido confirmacionCliente(Pedido pedido) {
+	ContenidoEmail confirmacionCliente(Pedido pedido) {
 		Partes partes = new Partes(
 				"¡Gracias por tu compra, " + pedido.getCliente().getNombre() + "!",
 				List.of("Recibimos el pago de tu pedido en " + tienda.nombre() + ". Te dejamos el detalle:"),
@@ -56,7 +53,7 @@ class PlantillasPedido {
 		return armar("Confirmación de tu compra en " + tienda.nombre(), pedido, partes);
 	}
 
-	Contenido avisoAdmin(Pedido pedido) {
+	ContenidoEmail avisoAdmin(Pedido pedido) {
 		DatosCliente cliente = pedido.getCliente();
 		List<String> datosCliente = new ArrayList<>(List.of(
 				"Nombre: " + cliente.getNombre() + " " + cliente.getApellido(),
@@ -84,7 +81,7 @@ class PlantillasPedido {
 			List<String> cierre, boolean firma) {
 	}
 
-	private Contenido armar(String asunto, Pedido pedido, Partes partes) {
+	private ContenidoEmail armar(String asunto, Pedido pedido, Partes partes) {
 		String moneda = pedido.getMoneda();
 		List<String> entrega = entrega(pedido);
 		List<Total> totales = totales(pedido);
@@ -144,7 +141,7 @@ class PlantillasPedido {
 		if (partes.firma()) {
 			texto.append(NO_FUE_USTED).append("\n");
 		}
-		return new Contenido(asunto, html.toString(), texto.toString());
+		return new ContenidoEmail(asunto, html.toString(), texto.toString());
 	}
 
 	private static List<Total> totales(Pedido pedido) {

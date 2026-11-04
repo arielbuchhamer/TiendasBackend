@@ -37,7 +37,7 @@ class EmailsPedido {
 	}
 
 	private static EmailPendiente nuevo(TipoEmail tipo, Pedido pedido, List<String> destinatarios, String responderA,
-			PlantillasPedido.Contenido contenido) {
+			ContenidoEmail contenido) {
 		EmailPendiente pendiente = new EmailPendiente();
 		pendiente.setTipo(tipo);
 		pendiente.setPedidoId(pedido.getId());

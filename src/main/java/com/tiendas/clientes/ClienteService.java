@@ -1,6 +1,9 @@
 package com.tiendas.clientes;
 
+import java.time.Instant;
 import java.util.Set;
+
+import org.springframework.context.ApplicationEventPublisher;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,10 +30,17 @@ class ClienteService {
 
 	private final ClienteRepository clienteRepository;
 	private final PedidoRepository pedidoRepository;
+	private final TokensCliente tokens;
+	private final ClientesProperties propiedades;
+	private final ApplicationEventPublisher eventos;
 
-	ClienteService(ClienteRepository clienteRepository, PedidoRepository pedidoRepository) {
+	ClienteService(ClienteRepository clienteRepository, PedidoRepository pedidoRepository, TokensCliente tokens,
+			ClientesProperties propiedades, ApplicationEventPublisher eventos) {
 		this.clienteRepository = clienteRepository;
 		this.pedidoRepository = pedidoRepository;
+		this.tokens = tokens;
+		this.propiedades = propiedades;
+		this.eventos = eventos;
 	}
 
 	Page<Cliente> listar(FiltroClientes filtro, Pageable pagina) {
@@ -79,6 +89,27 @@ class ClienteService {
 			case ACTIVO -> cliente.isTieneClave() ? EstadoCliente.ACTIVO : EstadoCliente.PENDIENTE;
 			case PENDIENTE -> throw new ReglaNegocioException("El estado puede ser ACTIVO o BLOQUEADO");
 		});
+		return cliente;
+	}
+
+	/**
+	 * Genera el link de activación y encola el email (botón "Enviar invitación" del panel). Volver a enviarla
+	 * invalida el link anterior. Solo para cuentas pendientes: una cuenta activa usa "olvidé mi contraseña".
+	 */
+	@Transactional
+	Cliente enviarInvitacion(Long id) {
+		Cliente cliente = obtener(id);
+		switch (cliente.getEstado()) {
+			case PENDIENTE -> {
+			}
+			case ACTIVO -> throw new ReglaNegocioException(
+					"El cliente ya activó su cuenta: si no recuerda la contraseña, puede pedir un link nuevo al iniciar sesión");
+			case BLOQUEADO -> throw new ReglaNegocioException("El cliente está bloqueado: reactivalo antes de invitarlo");
+		}
+		String token = tokens.generar(cliente.getId(), TipoTokenCliente.ACTIVACION);
+		cliente.setInvitadoEn(Instant.now());
+		eventos.publishEvent(new InvitacionCliente(cliente.getId(), cliente.getEmail(), cliente.getNombre(),
+				tokens.link(TipoTokenCliente.ACTIVACION, token), propiedades.vigenciaInvitacion()));
 		return cliente;
 	}
 

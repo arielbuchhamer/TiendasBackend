@@ -61,6 +61,12 @@ class ClienteController {
 		return clienteService.cambiarEstado(id, cambio.estado());
 	}
 
+	/** Genera el link de activación y le manda el email al cliente. */
+	@PostMapping("/{id}/invitacion")
+	Cliente enviarInvitacion(@PathVariable Long id) {
+		return clienteService.enviarInvitacion(id);
+	}
+
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	void eliminar(@PathVariable Long id) {

@@ -17,6 +17,11 @@ interface ClienteTokenRepository extends JpaRepository<ClienteToken, Long> {
 			+ " WHERE t.clienteId = :clienteId AND t.tipo = :tipo AND t.usadoEn IS NULL")
 	void invalidarAnteriores(Long clienteId, TipoTokenCliente tipo, Instant ahora);
 
+	/** 1 si lo marcó; 0 si otro request lo usó primero. */
+	@Modifying
+	@Query("UPDATE ClienteToken t SET t.usadoEn = :ahora WHERE t.id = :id AND t.usadoEn IS NULL")
+	int marcarUsado(Long id, Instant ahora);
+
 	@Modifying
 	@Query("DELETE FROM ClienteToken t WHERE t.venceEn < :limite")
 	int borrarVencidosAntesDe(Instant limite);
