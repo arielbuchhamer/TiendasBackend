@@ -19,6 +19,8 @@ import org.springframework.util.StringUtils;
 
 import com.tiendas.catalogo.Variante;
 import com.tiendas.catalogo.VarianteRepository;
+import com.tiendas.clientes.ClientesProperties;
+import com.tiendas.comun.NoAutenticadoException;
 import com.tiendas.comun.ReglaNegocioException;
 import com.tiendas.comun.ServicioExternoException;
 import com.tiendas.config.TiendaProperties;
@@ -61,10 +63,12 @@ public class CheckoutService {
 	private final CuponService cuponService;
 	private final EnvioService envioService;
 	private final PersonalizacionService personalizacionService;
+	private final ClientesProperties clientes;
 
 	public CheckoutService(VarianteRepository varianteRepository, PedidoRepository pedidoRepository,
 			PasarelaPago pasarelaPago, TransactionTemplate transaccion, TiendaProperties tienda,
-			CuponService cuponService, EnvioService envioService, PersonalizacionService personalizacionService) {
+			CuponService cuponService, EnvioService envioService, PersonalizacionService personalizacionService,
+			ClientesProperties clientes) {
 		this.varianteRepository = varianteRepository;
 		this.pedidoRepository = pedidoRepository;
 		this.pasarelaPago = pasarelaPago;
@@ -73,11 +77,39 @@ public class CheckoutService {
 		this.cuponService = cuponService;
 		this.envioService = envioService;
 		this.personalizacionService = personalizacionService;
+		this.clientes = clientes;
 	}
 
-	/** @param ip IP del comprador, para frenar a quien prueba códigos de cupón al azar */
+	/**
+	 * Checkout anónimo: los datos del comprador vienen en la solicitud. Con el módulo de clientes activo no se
+	 * permite: para comprar hace falta una cuenta ({@link #iniciarConCuenta}).
+	 *
+	 * @param ip IP del comprador, para frenar a quien prueba códigos de cupón al azar
+	 */
 	public Pedido iniciar(Pedido solicitud, String ip) {
-		Pedido pedido = transaccion.execute(estado -> pedidoRepository.save(armarPedido(solicitud, ip, true)));
+		if (clientes.habilitada()) {
+			throw new NoAutenticadoException("Iniciá sesión para comprar");
+		}
+		return crear(solicitud, null, ip);
+	}
+
+	/**
+	 * Checkout de un cliente con sesión (módulo de clientes). Los datos del comprador salen de su cuenta: lo que
+	 * traiga la solicitud se ignora.
+	 *
+	 * @param comprador copia de los datos de la cuenta, que queda guardada en el pedido como en el checkout anónimo
+	 */
+	public Pedido iniciarConCuenta(Pedido solicitud, Long clienteId, DatosCliente comprador, String ip) {
+		solicitud.setCliente(comprador);
+		return crear(solicitud, clienteId, ip);
+	}
+
+	private Pedido crear(Pedido solicitud, Long clienteId, String ip) {
+		Pedido pedido = transaccion.execute(estado -> {
+			Pedido nuevo = armarPedido(solicitud, ip, true);
+			nuevo.setClienteId(clienteId);
+			return pedidoRepository.save(nuevo);
+		});
 		try {
 			PasarelaPago.CheckoutExterno checkout = pasarelaPago.crearCheckout(pedido);
 			transaccion.executeWithoutResult(

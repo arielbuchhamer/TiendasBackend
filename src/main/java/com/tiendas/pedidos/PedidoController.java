@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
 
 import com.tiendas.config.IpCliente;
 
@@ -26,6 +27,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.groups.Default;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -50,11 +52,13 @@ public class PedidoController {
 
 	/**
 	 * Crea el pedido y devuelve, entre otros datos, {@code checkoutUrl}: la URL de Mercado Pago a la que
-	 * el frontend debe redirigir al comprador.
+	 * el frontend debe redirigir al comprador. Con el módulo de clientes activo responde 401: se compra con sesión
+	 * en {@code POST /api/v1/clientes/yo/checkout}.
 	 */
 	@PostMapping("/checkout")
 	@ResponseStatus(HttpStatus.CREATED)
-	public Pedido checkout(@Valid @RequestBody Pedido pedido, HttpServletRequest request) {
+	public Pedido checkout(@Validated({ Default.class, CheckoutAnonimo.class }) @RequestBody Pedido pedido,
+			HttpServletRequest request) {
 		return checkoutService.iniciar(pedido, ipCliente.de(request));
 	}
 

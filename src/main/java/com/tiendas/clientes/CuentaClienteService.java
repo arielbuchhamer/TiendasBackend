@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.tiendas.comun.NoAutenticadoException;
 import com.tiendas.comun.NoEncontradoException;
 import com.tiendas.comun.ReglaNegocioException;
+import com.tiendas.pedidos.DatosCliente;
 
 /**
  * Lo que hace el propio cliente con su cuenta: activarla, recuperar la contraseña y consultar sus datos.
@@ -54,6 +55,18 @@ class CuentaClienteService {
 		return clienteRepository.findById(clienteId)
 				.filter(Cliente::estaActivo)
 				.orElseThrow(() -> new NoAutenticadoException("Tu sesión ya no es válida. Iniciá sesión de nuevo."));
+	}
+
+	/** Datos del comprador para el checkout, copiados de la cuenta activa (quedan guardados en el pedido). */
+	DatosCliente comprador(Long clienteId) {
+		Cliente cliente = activo(clienteId);
+		DatosCliente comprador = new DatosCliente();
+		comprador.setNombre(cliente.getNombre());
+		comprador.setApellido(cliente.getApellido());
+		comprador.setDocumento(cliente.getDocumento());
+		comprador.setEmail(cliente.getEmail());
+		comprador.setTelefono(cliente.getTelefono());
+		return comprador;
 	}
 
 	@Transactional

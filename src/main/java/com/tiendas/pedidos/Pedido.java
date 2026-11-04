@@ -46,7 +46,7 @@ public class Pedido extends EntidadBase {
 	private EstadoPedido estado;
 
 	@Valid
-	@NotNull
+	@NotNull(groups = CheckoutAnonimo.class)
 	@Embedded
 	private DatosCliente cliente;
 
