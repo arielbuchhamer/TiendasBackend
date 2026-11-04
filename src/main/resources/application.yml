@@ -140,6 +140,13 @@ envios:
 personalizacion:
   habilitada: ${PERSONALIZACION_HABILITADA:false}
 
+clientes:
+  habilitada: ${CLIENTES_HABILITADA:false}
+  horas-invitacion: ${CLIENTES_HORAS_INVITACION:72}
+  minutos-reseteo: ${CLIENTES_MINUTOS_RESETEO:60}
+  ruta-activacion: ${CLIENTES_RUTA_ACTIVACION:/account/activate}
+  ruta-reseteo: ${CLIENTES_RUTA_RESETEO:/account/reset}
+
 correo-argentino:
   habilitada: ${CORREO_ARGENTINO_HABILITADA:false}
   url: ${CORREO_ARGENTINO_URL:https://api.correoargentino.com.ar/micorreo/v1}

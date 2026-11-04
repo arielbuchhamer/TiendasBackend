@@ -3,6 +3,7 @@ package com.tiendas.config;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.tiendas.clientes.ClientesProperties;
 import com.tiendas.correo.CorreoArgentinoProperties;
 import com.tiendas.descuentos.DescuentosProperties;
 import com.tiendas.emails.EmailProperties;
@@ -26,18 +27,20 @@ class TiendaController {
 	 * el panel nunca muestra una sección cuyos endpoints no existen (ni al revés).
 	 */
 	record Modulos(boolean facturacion, boolean descuentos, boolean envios, boolean correoArgentino, boolean email,
-			boolean zipnova, boolean personalizacion) {
+			boolean zipnova, boolean personalizacion, boolean clientes) {
 	}
 
 	private final InfoTienda info;
 
 	TiendaController(TiendaProperties tienda, FacturacionProperties facturacion, DescuentosProperties descuentos,
 			EnviosProperties envios, CorreoArgentinoProperties correo, EmailProperties email,
-			ZipnovaProperties zipnova, PersonalizacionProperties personalizacion) {
+			ZipnovaProperties zipnova, PersonalizacionProperties personalizacion,
+			ClientesProperties clientes) {
 		this.info = new InfoTienda(tienda.nombre(), tienda.moneda(), tienda.envio(),
 				new Modulos(facturacion.habilitada(), descuentos.habilitada(), envios.habilitada(),
 						envios.habilitada() && correo.habilitada(), email.habilitada(),
-						envios.habilitada() && zipnova.habilitada(), personalizacion.habilitada()));
+						envios.habilitada() && zipnova.habilitada(), personalizacion.habilitada(),
+						clientes.habilitada()));
 	}
 
 	@GetMapping("/api/v1/tienda")
