@@ -2,16 +2,14 @@ package com.tiendas.usuarios;
 
 import java.time.Duration;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.stereotype.Component;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
+import com.tiendas.comun.ContadorIntentos;
 
 /**
  * Frena ataques de fuerza bruta al login: después de varios intentos fallidos se bloquea temporalmente
- * el usuario atacado y, por separado, la IP de origen. En memoria alcanza porque hay una instancia por tienda.
+ * el usuario atacado y, por separado, la IP de origen.
  */
 @Component
 public class LimitadorIntentosLogin {
@@ -20,35 +18,23 @@ public class LimitadorIntentosLogin {
 	static final int MAX_FALLOS_POR_IP = 30;
 	private static final Duration VENTANA = Duration.ofMinutes(15);
 
-	private final Cache<String, AtomicInteger> fallos = Caffeine.newBuilder()
-			.expireAfterWrite(VENTANA)
-			.maximumSize(100_000)
-			.build();
+	private final ContadorIntentos fallosPorUsuario = new ContadorIntentos(MAX_FALLOS_POR_USUARIO, VENTANA);
+	private final ContadorIntentos fallosPorIp = new ContadorIntentos(MAX_FALLOS_POR_IP, VENTANA);
 
 	public boolean estaBloqueado(String username, String ip) {
-		return cantidad(claveUsuario(username)) >= MAX_FALLOS_POR_USUARIO
-				|| cantidad(claveIp(ip)) >= MAX_FALLOS_POR_IP;
+		return fallosPorUsuario.superado(normalizar(username)) || fallosPorIp.superado(ip);
 	}
 
 	public void registrarFallo(String username, String ip) {
-		fallos.get(claveUsuario(username), clave -> new AtomicInteger()).incrementAndGet();
-		fallos.get(claveIp(ip), clave -> new AtomicInteger()).incrementAndGet();
+		fallosPorUsuario.registrar(normalizar(username));
+		fallosPorIp.registrar(ip);
 	}
 
 	public void registrarExito(String username) {
-		fallos.invalidate(claveUsuario(username));
+		fallosPorUsuario.reiniciar(normalizar(username));
 	}
 
-	private int cantidad(String clave) {
-		AtomicInteger contador = fallos.getIfPresent(clave);
-		return contador == null ? 0 : contador.get();
-	}
-
-	private static String claveUsuario(String username) {
-		return "u:" + (username == null ? "" : username.trim().toLowerCase(Locale.ROOT));
-	}
-
-	private static String claveIp(String ip) {
-		return "ip:" + ip;
+	private static String normalizar(String username) {
+		return username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
 	}
 }
