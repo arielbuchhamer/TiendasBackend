@@ -1,7 +1,6 @@
 package com.tiendas.usuarios;
 
 import java.util.List;
-import java.util.Locale;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.userdetails.User;
@@ -15,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.tiendas.comun.ConflictoException;
 import com.tiendas.comun.NoEncontradoException;
 import com.tiendas.comun.ReglaNegocioException;
+import com.tiendas.comun.Textos;
 
 @Service
 @Transactional(readOnly = true)
@@ -30,7 +30,7 @@ public class UsuarioService implements UserDetailsService {
 
 	@Override
 	public UserDetails loadUserByUsername(String username) {
-		Usuario usuario = usuarioRepository.findByUsername(normalizar(username))
+		Usuario usuario = usuarioRepository.findByUsername(Textos.minusculas(username))
 				.orElseThrow(() -> new UsernameNotFoundException("Usuario inexistente"));
 		return User.withUsername(usuario.getUsername())
 				.password(usuario.getPasswordHash())
@@ -48,7 +48,7 @@ public class UsuarioService implements UserDetailsService {
 	}
 
 	public Usuario obtenerPorUsername(String username) {
-		return usuarioRepository.findByUsername(normalizar(username))
+		return usuarioRepository.findByUsername(Textos.minusculas(username))
 				.orElseThrow(() -> new NoEncontradoException("Usuario no encontrado"));
 	}
 
@@ -58,7 +58,7 @@ public class UsuarioService implements UserDetailsService {
 			throw new ReglaNegocioException("La clave es obligatoria");
 		}
 		Usuario usuario = new Usuario();
-		usuario.setUsername(normalizar(datos.getUsername()));
+		usuario.setUsername(Textos.minusculas(datos.getUsername()));
 		usuario.setNombre(datos.getNombre());
 		usuario.setRol(datos.getRol() == null ? Rol.ADMIN : datos.getRol());
 		usuario.setActivo(datos.isActivo());
@@ -72,7 +72,7 @@ public class UsuarioService implements UserDetailsService {
 		if (!datos.isActivo() && usuario.isActivo()) {
 			validarQuePuedeQuitarse(usuario, usernameActual);
 		}
-		usuario.setUsername(normalizar(datos.getUsername()));
+		usuario.setUsername(Textos.minusculas(datos.getUsername()));
 		usuario.setNombre(datos.getNombre());
 		usuario.setActivo(datos.isActivo());
 		if (datos.getClave() != null) {
@@ -104,16 +104,12 @@ public class UsuarioService implements UserDetailsService {
 
 	// Evita que la tienda quede sin ningún administrador activo
 	private void validarQuePuedeQuitarse(Usuario usuario, String usernameActual) {
-		if (usuario.getUsername().equals(normalizar(usernameActual))) {
+		if (usuario.getUsername().equals(Textos.minusculas(usernameActual))) {
 			throw new ConflictoException("No podés desactivar ni eliminar tu propio usuario");
 		}
 		if (usuario.getRol() == Rol.ADMIN && usuario.isActivo()
 				&& usuarioRepository.countByRolAndActivoTrue(Rol.ADMIN) <= 1) {
 			throw new ConflictoException("Debe quedar al menos un administrador activo");
 		}
-	}
-
-	private static String normalizar(String username) {
-		return username == null ? null : username.trim().toLowerCase(Locale.ROOT);
 	}
 }

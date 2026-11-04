@@ -27,6 +27,7 @@ import org.springframework.util.StringUtils;
 
 import com.tiendas.archivos.ImagenRepository;
 import com.tiendas.comun.ConflictoException;
+import com.tiendas.comun.Consultas;
 import com.tiendas.comun.NoEncontradoException;
 import com.tiendas.comun.ReglaNegocioException;
 import com.tiendas.config.CacheConfig;
@@ -56,7 +57,8 @@ public class ProductoService {
 
 	@Cacheable(cacheNames = CacheConfig.CATALOGO, key = "'productos:' + #filtro + ':' + #incluirInactivos + ':' + #pagina")
 	public Page<Producto> buscar(FiltroProductos filtro, boolean incluirInactivos, Pageable pagina) {
-		Pageable paginaSegura = PageRequest.of(pagina.getPageNumber(), pagina.getPageSize(), validarOrden(pagina.getSort()));
+		Pageable paginaSegura = PageRequest.of(pagina.getPageNumber(), pagina.getPageSize(),
+				Consultas.ordenPermitido(pagina.getSort(), ORDENES_PERMITIDOS, ORDEN_POR_DEFECTO));
 		Page<Producto> productos = productoRepository.findAll(filtro.comoSpecification(incluirInactivos), paginaSegura);
 		productos.forEach(ProductoService::inicializar);
 		return productos;
@@ -196,19 +198,6 @@ public class ProductoService {
 			throw new ConflictoException(recurso + " fue modificado por otra operación (por ejemplo, una venta). "
 					+ "Volvé a cargarlo y reintentá.");
 		}
-	}
-
-	private static Sort validarOrden(Sort orden) {
-		if (orden.isUnsorted()) {
-			return ORDEN_POR_DEFECTO;
-		}
-		for (Sort.Order o : orden) {
-			if (!ORDENES_PERMITIDOS.contains(o.getProperty())) {
-				throw new ReglaNegocioException("No se puede ordenar por " + o.getProperty()
-						+ ". Opciones: " + ORDENES_PERMITIDOS);
-			}
-		}
-		return orden.and(ORDEN_POR_DEFECTO); // desempate estable para que la paginación no repita productos
 	}
 
 	private static boolean tieneDecimales(BigDecimal valor) {

@@ -2,10 +2,11 @@ package com.tiendas.catalogo;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
+
+import com.tiendas.comun.Consultas;
 
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -34,17 +35,13 @@ public record FiltroProductos(Long rubroId, Long categoriaId, String texto, Bool
 			}
 			if (StringUtils.hasText(texto)) {
 				// lower(nombre) LIKE '%texto%' usa el índice trigram ix_producto_nombre_trgm
-				String patron = "%" + escaparLike(texto.trim().toLowerCase(Locale.ROOT)) + "%";
-				condiciones.add(cb.like(cb.lower(producto.get("nombre")), patron, '\\'));
+				condiciones.add(cb.like(cb.lower(producto.get("nombre")), Consultas.patronContiene(texto),
+						Consultas.ESCAPE_LIKE));
 			}
 			if (Boolean.TRUE.equals(destacados)) {
 				condiciones.add(cb.isTrue(producto.get("destacado")));
 			}
 			return cb.and(condiciones.toArray(Predicate[]::new));
 		};
-	}
-
-	private static String escaparLike(String texto) {
-		return texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 	}
 }
