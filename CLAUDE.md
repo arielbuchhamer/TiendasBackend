@@ -248,7 +248,8 @@ ningún bean del paquete, el checkout es anónimo como siempre y las tablas qued
 - **Alta**: no hay registro público. El administrador crea al cliente en el panel (`/api/v1/admin/clientes`), que queda
   `PENDIENTE` y sin contraseña, y le manda la invitación (`POST …/{id}/invitacion`). Estados (`EstadoCliente`):
   `PENDIENTE`, `ACTIVO`, `BLOQUEADO`; reactivar a quien no eligió contraseña lo deja `PENDIENTE`. Un cliente con
-  pedidos no se borra, se bloquea. El email se guarda en minúsculas (`Textos.minusculas`) y es único.
+  pedidos no se borra, se bloquea. El email se guarda en minúsculas (`Textos.minusculas`) y es único. El CUIT/DNI es
+  opcional (vacío = null); un pedido con cuenta sin documento queda sin él (el checkout anónimo lo sigue exigiendo).
 - **Links** (`TokensCliente`, tabla `cliente_token`): activación (`CLIENTES_HORAS_INVITACION`) y cambio de contraseña
   (`CLIENTES_MINUTOS_RESETEO`), de un solo uso (UPDATE condicional) y con vencimiento; solo vale el último de cada
   tipo. Se guarda el SHA-256: el token en claro solo viaja en el email. Inexistente, usado o vencido dan el mismo 404.

@@ -128,7 +128,7 @@ class ClienteService {
 		cliente.setEmail(email);
 		cliente.setNombre(datos.getNombre().trim());
 		cliente.setApellido(datos.getApellido().trim());
-		cliente.setDocumento(datos.getDocumento().trim());
+		cliente.setDocumento(Textos.opcional(datos.getDocumento()));
 		cliente.setRazonSocial(Textos.opcional(datos.getRazonSocial()));
 		cliente.setTelefono(Textos.opcional(datos.getTelefono()));
 		cliente.setProvincia(Textos.opcional(datos.getProvincia()));

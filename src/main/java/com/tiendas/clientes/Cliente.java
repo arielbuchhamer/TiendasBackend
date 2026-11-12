@@ -43,9 +43,8 @@ public class Cliente extends EntidadBase {
 	@Size(max = 100)
 	private String apellido;
 
-	/** CUIT o DNI, mismo formato que el documento del checkout. */
-	@NotBlank
-	@Pattern(regexp = "[0-9A-Za-z.-]{5,20}", message = "documento inválido")
+	/** CUIT o DNI, opcional; si viene, mismo formato que el documento del checkout (vacío se guarda como null). */
+	@Pattern(regexp = "\\s*|[0-9A-Za-z.-]{5,20}", message = "documento inválido")
 	private String documento;
 
 	@Size(max = 160)

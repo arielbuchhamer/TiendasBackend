@@ -25,7 +25,8 @@ public class DatosCliente {
 	@Column(name = "cliente_apellido")
 	private String apellido;
 
-	@NotBlank
+	/** Obligatorio en el checkout anónimo; con cuenta de cliente se copia de la cuenta, donde es opcional. */
+	@NotBlank(groups = CheckoutAnonimo.class)
 	@Pattern(regexp = "[0-9A-Za-z.-]{5,20}", message = "documento inválido")
 	@Column(name = "cliente_documento")
 	private String documento;

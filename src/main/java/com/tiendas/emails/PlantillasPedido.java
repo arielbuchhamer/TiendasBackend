@@ -56,9 +56,11 @@ class PlantillasPedido {
 	ContenidoEmail avisoAdmin(Pedido pedido) {
 		DatosCliente cliente = pedido.getCliente();
 		List<String> datosCliente = new ArrayList<>(List.of(
-				"Nombre: " + cliente.getNombre() + " " + cliente.getApellido(),
-				"Documento: " + cliente.getDocumento(),
-				"Email: " + cliente.getEmail()));
+				"Nombre: " + cliente.getNombre() + " " + cliente.getApellido()));
+		if (StringUtils.hasText(cliente.getDocumento())) {
+			datosCliente.add("Documento: " + cliente.getDocumento());
+		}
+		datosCliente.add("Email: " + cliente.getEmail());
 		if (StringUtils.hasText(cliente.getTelefono())) {
 			datosCliente.add("Teléfono: " + cliente.getTelefono());
 		}
