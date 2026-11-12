@@ -59,7 +59,7 @@ class CuentaClienteController {
 
 	/** Mismo 401 para email inexistente, contraseña incorrecta y cuenta pendiente o bloqueada. */
 	@PostMapping("/login")
-	Cliente login(@Valid @RequestBody LoginCliente login, HttpServletRequest request, HttpServletResponse response) {
+	CuentaCliente login(@Valid @RequestBody LoginCliente login, HttpServletRequest request, HttpServletResponse response) {
 		String email = Textos.minusculas(login.email());
 		String ip = ipCliente.de(request);
 		limitador.validarLogin(email, ip);
@@ -73,7 +73,7 @@ class CuentaClienteController {
 		}
 		limitador.registrarExitoLogin(email);
 		inicioSesion.iniciar(sesion, request, response);
-		return cuentaService.registrarAcceso(AutenticacionClientes.clienteId(sesion));
+		return CuentaCliente.de(cuentaService.registrarAcceso(AutenticacionClientes.clienteId(sesion)));
 	}
 
 	@GetMapping("/activacion/{token}")

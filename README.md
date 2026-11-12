@@ -144,7 +144,7 @@ Listados paginados: `?page=0&size=24&sort=precio,asc` → `{ "content": [...], "
 | `GET /clientes/activacion/{token}`, `POST /clientes/activacion` `{ token, clave }` | Datos para el saludo / elige la primera contraseña (404 si el link no sirve) |
 | `POST /clientes/olvide-clave` `{ email }` | Manda el link para cambiar la contraseña; siempre 204 |
 | `GET /clientes/reseteo/{token}`, `POST /clientes/reseteo` `{ token, clave }` | Igual que la activación, para una contraseña nueva |
-| `GET /clientes/yo`, `PUT /clientes/yo/clave` `{ claveActual, claveNueva }` | Cuenta del cliente con sesión |
+| `GET /clientes/yo`, `PUT /clientes/yo/clave` `{ claveActual, claveNueva }` | Cuenta del cliente con sesión (sin `notas` ni `invitadoEn`, que son del panel; también en la respuesta del login) |
 | `POST /clientes/yo/checkout` | Checkout con sesión: mismo body que `POST /checkout` sin `cliente` |
 | `GET /clientes/yo/pedidos`, `GET /clientes/yo/pedidos/{codigo}` | Pedidos del cliente |
 

@@ -261,7 +261,8 @@ ningún bean del paquete, el checkout es anónimo como siempre y las tablas qued
   único del contexto. El nombre de la sesión es el **id** del cliente (no cambia si el admin edita el email). Pendiente,
   bloqueado, inexistente y contraseña incorrecta dan el mismo 401 (y el mismo tiempo de respuesta). Límites propios
   (`LimitadorIntentosCliente`), independientes de los del admin. `GET /auth/yo` da 401 a una sesión de cliente.
-- **Sesión**: `/api/v1/clientes/yo/**` (`MiCuentaController`) relee la cuenta en cada request
+- **Sesión**: el login y `GET /clientes/yo` devuelven `CuentaCliente` (la entidad sin `notas` ni `invitadoEn`, que son
+  del admin); el panel sigue recibiendo `Cliente` completo. `/api/v1/clientes/yo/**` (`MiCuentaController`) relee la cuenta en cada request
   (`CuentaClienteService#activo`): bloquear a un cliente corta su sesión abierta. Los datos los edita solo el admin.
 - **Checkout**: con el módulo activo se compra en `POST /api/v1/clientes/yo/checkout` (con CSRF) y `POST /checkout`
   responde 401. `CheckoutService#iniciarConCuenta` copia los datos de la cuenta en `pedido.cliente` (ignora los del

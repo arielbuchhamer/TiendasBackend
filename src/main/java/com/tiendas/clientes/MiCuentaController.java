@@ -52,8 +52,8 @@ class MiCuentaController {
 	}
 
 	@GetMapping
-	Cliente yo(Authentication sesion) {
-		return cuentaService.activo(AutenticacionClientes.clienteId(sesion));
+	CuentaCliente yo(Authentication sesion) {
+		return CuentaCliente.de(cuentaService.activo(AutenticacionClientes.clienteId(sesion)));
 	}
 
 	@PutMapping("/clave")
